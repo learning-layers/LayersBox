@@ -1,0 +1,120 @@
+#!/usr/bin/env python2
+
+import subprocess
+import os
+import sys
+import argparse
+import shutil
+
+programs = ["docker", "docker-compose"]
+yml = "docker-compose.yml"
+minimal = 'minimal.yml'
+src = os.path.dirname(os.path.realpath(__file__))
+
+def which(program):
+    """Emulates the 'which' utility and checks wether a program exists in PATH and is executable
+
+    :program: String containing the name of the program
+    :returns: True if the program exists and is executable, False otherwise
+    """
+    import os
+    def is_exe(fpath):
+        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
+    fpath, fname = os.path.split(program)
+    if fpath:
+        if is_exe(program):
+            return program
+    else:
+        for path in os.environ["PATH"].split(os.pathsep):
+            path = path.strip('"')
+            exe_file = os.path.join(path, program)
+            if is_exe(exe_file):
+                return exe_file
+
+    return None
+
+def check_programs(programs):
+    """Checks if nedes programs are in PATH
+
+    :program: List of program names
+    :returns: True if all programs exist, False otherwise
+
+    """
+    for p in programs:
+        if not which(p):
+            print("% is not installed! Exiting.".format(p))
+            return False
+    return True
+
+def box_start():
+    """Starts a LayersBox"""
+    subprocess.check_output(["docker-compose", "up"])
+
+def box_stop():
+    """Stops a LayersBox"""
+    subprocess.check_output(["docker-compose", "stop"])
+
+def box_init(args):
+    """Initializes a LayersBox"""
+    print("Initializing LayersBox...")
+    dst = args.directory
+    dst_env = os.path.join(dst, 'common.env')
+    try:
+        os.stat(dst_env)
+    except:
+        url = raw_input("Enter the URL the box should be reachable at. (Don't put a / at the end)\nhttps://")
+        with open("common.env", 'w') as f:
+            f.write("LAYERS_API_URI=https://{}/\n".format(url))
+            f.write("LAYERS_API_URL=https://{}/\n".format(url))
+            f.write("LAYERS_APP_URI=https://{}/\n".format(url))
+    dst_yml = os.path.join(dst, yml)
+    try:
+        os.stat(dst_yml)
+    except:
+        print("No docker configuration found, using minimal configuration")
+        shutil.copy(os.path.join(src, minimal), dst_yml)
+
+    print("Initializiot complete. You can start your LayersBox with 'layersbox start'")
+    return 0
+
+def parse_args():
+    """Parses the command line arguments to choose which action should be taken
+    """
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(help='commands', dest='command')
+
+    start_parser = subparsers.add_parser('start', help='Starts the LayersBox')
+
+    stop_parser  = subparsers.add_parser("stop", help="Stops the LayersBox")
+
+    init_parser  = subparsers.add_parser("init", help="Initializes a LayersBox in the current directory")
+    init_parser.add_argument('--directory', '-d', action='store', help='The directory to use', default='.')
+    init_parser.set_defaults(func=box_init)
+
+    return parser.parse_args()
+
+def check_yml(dst):
+    """Check if docker-compose.yml exists
+    :returns: True if it exists, False otherwise
+    """
+    try:
+        os.stat(os.path.join(dst, yml))
+    except:
+        print("{} is missing in directory {}.".format(yml, dst))
+        sys.exit(1)
+
+
+def main():
+    """Entrypoint
+    """
+    if not check_programs(programs):
+        sys.exit(1)
+
+
+    parsed = parse_args()
+    parsed.func(parsed)
+
+
+if __name__ == "__main__":
+    main()
