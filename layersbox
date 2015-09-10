@@ -19,7 +19,7 @@ minimal_data = '''adapterdata:
     env_file:
         - common.env
 adapterservices:
-    image: learninglayers/adapter-externals
+    image: gordinlearninglayers/adapter-externals
 adapter:
     container_name: adapter
     image: learninglayers/adapter
