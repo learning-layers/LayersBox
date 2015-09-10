@@ -2,6 +2,7 @@
 
 import subprocess
 import os
+join = os.path.join
 import sys
 import argparse
 import shutil
@@ -18,7 +19,6 @@ def which(program):
     :program: String containing the name of the program
     :returns: True if the program exists and is executable, False otherwise
     """
-    import os
     def is_exe(fpath):
         return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
@@ -29,7 +29,7 @@ def which(program):
     else:
         for path in os.environ["PATH"].split(os.pathsep):
             path = path.strip('"')
-            exe_file = os.path.join(path, program)
+            exe_file = join(path, program)
             if is_exe(exe_file):
                 return exe_file
 
@@ -55,7 +55,7 @@ def read_url(dst):
     :returns: the LayersBox URL
 
     """
-    dst_env = os.path.join(dst, 'common.env')
+    dst_env = join(dst, 'common.env')
     try:
         os.stat(dst_env)
         with open(dst_env, 'r') as f:
@@ -76,27 +76,45 @@ def check_tls(dst, url):
     :returns: True if everything is OK, False otherwise
 
     """
-    ssl_path = os.path.join(dst, 'ssl/')
+    ssl_path = join(dst, 'ssl/')
     try:
-        os.stat(os.path.join(ssl_path, url + '.pem'))
-        os.stat(os.path.join(ssl_path, url + '.key'))
+        os.stat(join(ssl_path, url + '.pem'))
+        os.stat(join(ssl_path, url + '.key'))
         return True
     except:
-        print("Please put your TLS certificate {0}.pem and key {0}.key into {1}".format(url, os.path.join(dst, 'ssl/')))
+        print("Please put your TLS certificate {0}.pem and key {0}.key into {1}".format(url, join(dst, 'ssl/')))
         return False
 
 def box_start(args):
     """Starts a LayersBox"""
-    dir = args.directory
-    url = read_url(dir)
-    if not check_tls(dir, url):
+    try:
+        read_url(args.directory)
+    except:
+        print("This directory does not seem to contain a LayersBox")
         return 1
     subprocess.check_output(["docker-compose", "up", "-d"])
     return 0
 
 def box_stop(args):
     """Stops a LayersBox"""
+    try:
+        read_url(args.directory)
+    except:
+        print("This directory does not seem to contain a LayersBox")
+        return 1
     subprocess.check_output(["docker-compose", "stop"])
+    return 0
+
+def box_logs(args):
+    """Shows logs of a LayersBox"""
+    dir = args.directory
+    subprocess.check_output(["docker-compose", "logs"])
+    return 0
+
+def box_ps(args):
+    """Shows the states of the services inside the LayersBox"""
+    dir = args.directory
+    print (subprocess.check_output(["docker-compose", "ps"]))
     return 0
 
 def box_init(args):
@@ -113,16 +131,20 @@ def box_init(args):
             f.write("LAYERS_API_URI=https://{}/\n".format(url))
             f.write("LAYERS_API_URL=https://{}/\n".format(url))
             f.write("LAYERS_APP_URI=https://{}/\n".format(url))
-    dst_yml = os.path.join(dst, yml)
+    dst_yml = join(dst, yml)
     try:
         os.stat(dst_yml)
         print("Found docker-compose configuration")
     except:
         print("No docker configuration found, using minimal configuration")
-        shutil.copy(os.path.join(src, minimal), dst_yml)
+        shutil.copy(join(src, minimal), dst_yml)
 
+    ssl_dir = join(dst, 'ssl/')
+    if not os.path.exists(ssl_dir):
+        os.makedirs(ssl_dir)
     print("Initializion complete.")
     check_tls(dst, url)
+    print("Make sure port 80 and 443 are not in use on this machine")
     print("You can start your LayersBox with 'layersbox start'")
     return 0
 
@@ -130,19 +152,27 @@ def parse_args():
     """Parses the command line arguments to choose which action should be taken
     """
     parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(help='commands', dest='command')
+    subparsers = parser.add_subparsers(help='commands (use "layersbox -h command" to find out about their parameters)', dest='command')
 
     start_parser = subparsers.add_parser('start', help='Starts the LayersBox')
-    start_parser.add_argument('--directory', '-d', action='store', help='The directory to use', default='.')
+    start_parser.add_argument('--directory', '-d', action='store', help='Directory of the box', default='.')
     start_parser.set_defaults(func=box_start)
 
     stop_parser  = subparsers.add_parser("stop", help="Stops the LayersBox")
-    stop_parser.add_argument('--directory', '-d', action='store', help='The directory to use', default='.')
+    stop_parser.add_argument('--directory', '-d', action='store', help='Directory of the box', default='.')
     stop_parser.set_defaults(func=box_stop)
 
     init_parser  = subparsers.add_parser("init", help="Initializes a LayersBox in the current directory")
     init_parser.add_argument('--directory', '-d', action='store', help='The directory to use', default='.')
     init_parser.set_defaults(func=box_init)
+
+    # logs_parser = subparsers.add_parser('logs', help='Shows logs of the LayersBox')
+    # logs_parser.add_argument('--directory', '-d', action='store', help='Directory of the box', default='.')
+    # logs_parser.set_defaults(func=box_logs)
+
+    ps_parser = subparsers.add_parser('status', help='Shows the states of the services inside the LayersBox')
+    ps_parser.add_argument('--directory', '-d', action='store', help='Directory of the box', default='.')
+    ps_parser.set_defaults(func=box_ps)
 
     return parser.parse_args()
 
@@ -151,7 +181,7 @@ def check_yml(dst):
     :returns: True if it exists, False otherwise
     """
     try:
-        os.stat(os.path.join(dst, yml))
+        os.stat(join(dst, yml))
     except:
         print("{} is missing in directory {}.".format(yml, dst))
         sys.exit(1)
