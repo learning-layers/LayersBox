@@ -5,6 +5,7 @@ import os
 import sys
 import argparse
 import shutil
+import re
 
 programs = ["docker", "docker-compose"]
 yml = "docker-compose.yml"
@@ -35,7 +36,7 @@ def which(program):
     return None
 
 def check_programs(programs):
-    """Checks if nedes programs are in PATH
+    """Checks if given programs are in PATH
 
     :program: List of program names
     :returns: True if all programs exist, False otherwise
@@ -47,23 +48,67 @@ def check_programs(programs):
             return False
     return True
 
-def box_start():
-    """Starts a LayersBox"""
-    subprocess.check_output(["docker-compose", "up"])
+def read_url(dst):
+    """Reads the LayersBox URL from the common.env file
 
-def box_stop():
+    :dest: The directory of the LayersBox
+    :returns: the LayersBox URL
+
+    """
+    dst_env = os.path.join(dst, 'common.env')
+    try:
+        os.stat(dst_env)
+        with open(dst_env, 'r') as f:
+            lines = f.readlines()
+            p = re.compile('^LAYERS_API_URI=https://(.*)/$')
+            for line in lines:
+                line = line.strip()
+                m = p.match(line)
+                if m:
+                    return m.group(1)
+    except:
+        raise
+
+def check_tls(dst, url):
+    """Checks if the TLS certificate and key are where they should be
+
+    :dest: folder of the LayersBox
+    :returns: True if everything is OK, False otherwise
+
+    """
+    ssl_path = os.path.join(dst, 'ssl/')
+    try:
+        os.stat(os.path.join(ssl_path, url + '.pem'))
+        os.stat(os.path.join(ssl_path, url + '.key'))
+        return True
+    except:
+        print("Please put your TLS certificate {0}.pem and key {0}.key into {1}".format(url, os.path.join(dst, 'ssl/')))
+        return False
+
+def box_start(args):
+    """Starts a LayersBox"""
+    dir = args.directory
+    url = read_url(dir)
+    if not check_tls(dir, url):
+        return 1
+    subprocess.check_output(["docker-compose", "up", "-d"])
+    return 0
+
+def box_stop(args):
     """Stops a LayersBox"""
     subprocess.check_output(["docker-compose", "stop"])
+    return 0
 
 def box_init(args):
     """Initializes a LayersBox"""
     print("Initializing LayersBox...")
     dst = args.directory
-    dst_env = os.path.join(dst, 'common.env')
+    url = "THIS SHOULD HAVE BEEN REPLACED"
     try:
-        os.stat(dst_env)
+        url = read_url(dst)
+        print("Found existing configuration, using URL https://{}/".format(url))
     except:
-        url = raw_input("Enter the URL the box should be reachable at. (Don't put a / at the end)\nhttps://")
+        url = raw_input("Enter the URL the box should be reachable at. (Don't put a / at the end)\nhttps://").strip("/")
         with open("common.env", 'w') as f:
             f.write("LAYERS_API_URI=https://{}/\n".format(url))
             f.write("LAYERS_API_URL=https://{}/\n".format(url))
@@ -71,11 +116,14 @@ def box_init(args):
     dst_yml = os.path.join(dst, yml)
     try:
         os.stat(dst_yml)
+        print("Found docker-compose configuration")
     except:
         print("No docker configuration found, using minimal configuration")
         shutil.copy(os.path.join(src, minimal), dst_yml)
 
-    print("Initializiot complete. You can start your LayersBox with 'layersbox start'")
+    print("Initializion complete.")
+    check_tls(dst, url)
+    print("You can start your LayersBox with 'layersbox start'")
     return 0
 
 def parse_args():
@@ -85,8 +133,12 @@ def parse_args():
     subparsers = parser.add_subparsers(help='commands', dest='command')
 
     start_parser = subparsers.add_parser('start', help='Starts the LayersBox')
+    start_parser.add_argument('--directory', '-d', action='store', help='The directory to use', default='.')
+    start_parser.set_defaults(func=box_start)
 
     stop_parser  = subparsers.add_parser("stop", help="Stops the LayersBox")
+    stop_parser.add_argument('--directory', '-d', action='store', help='The directory to use', default='.')
+    stop_parser.set_defaults(func=box_stop)
 
     init_parser  = subparsers.add_parser("init", help="Initializes a LayersBox in the current directory")
     init_parser.add_argument('--directory', '-d', action='store', help='The directory to use', default='.')
@@ -113,7 +165,7 @@ def main():
 
 
     parsed = parse_args()
-    parsed.func(parsed)
+    sys.exit(parsed.func(parsed))
 
 
 if __name__ == "__main__":
