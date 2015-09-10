@@ -5,7 +5,6 @@ adapterdata:
         - common.env
 adapterservices:
     image: learninglayers/adapter-externals
-    volumes_from:
 adapter:
     container_name: adapter
     image: learninglayers/adapter
