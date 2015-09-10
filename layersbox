@@ -11,7 +11,29 @@ import re
 programs = ["docker", "docker-compose"]
 yml = "docker-compose.yml"
 minimal = 'minimal.yml'
-src = os.path.dirname(os.path.realpath(__file__))
+# src = os.path.dirname(os.path.realpath(__file__))
+
+minimal_data = '''adapterdata:
+    container_name: adapter-data
+    image: learninglayers/adapter-data
+    env_file:
+        - common.env
+adapterservices:
+    image: learninglayers/adapter-externals
+adapter:
+    container_name: adapter
+    image: learninglayers/adapter
+    volumes_from:
+        - adapterdata
+        - adapterservices
+    volumes:
+        - ./ssl/:/usr/local/openresty/conf/ssl/
+    env_file:
+        - common.env
+    ports:
+        - "80:80"
+        - "443:443"
+'''
 
 def which(program):
     """Emulates the 'which' utility and checks wether a program exists in PATH and is executable
@@ -137,7 +159,8 @@ def box_init(args):
         print("Found docker-compose configuration")
     except:
         print("No docker configuration found, using minimal configuration")
-        shutil.copy(join(src, minimal), dst_yml)
+        with open(dst_yml, 'w') as f:
+            f.write(minimal_data)
 
     ssl_dir = join(dst, 'ssl/')
     if not os.path.exists(ssl_dir):
