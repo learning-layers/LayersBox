@@ -107,6 +107,48 @@ def check_tls(dst, url):
         print("Please put your TLS certificate {0}.pem and key {0}.key into {1}".format(url, join(dst, 'ssl/')))
         return False
 
+def generate_cert(dst, domain):
+    """Generates a self-signed TLS certificate
+
+    :dst: folder where the certificate and key should be placed
+    :domain: domain for that the certificate will be valid
+    :returns: True if successful, False otherwise
+
+    """
+    if not which("openssl"):
+        print("openssl is not installed! Can't generate a certificate.")
+        return False
+    privkey_file = join(dst, domain + ".key")
+    csr_file = join(dst, domain + ".csr")
+    cert_file = join(dst, domain + ".pem")
+    subj= "/C=DE/ST=NRW/O=RWTH/localityName=Aachen/commonName={}/organizationalUnitName=ACIS/emailAddress=acis@dbis.rwth-aachen.de/"
+    if not os.path.isfile(privkey_file):
+        print("Generating key file {}".format(privkey_file))
+        subprocess.check_output(["openssl", "genrsa",
+                                 "-out", privkey_file,
+                                 "4096"])
+        print("Generating CSR file {}".format(csr_file))
+        subprocess.check_output(["openssl", "req",
+                                 "-new",
+                                 "-batch",
+                                 "-subj", subj.format(domain),
+                                 "-key", '{}'.format(privkey_file),
+                                 "-out", '{}'.format(csr_file)])
+        print("Generating certificate file {}".format(cert_file))
+        subprocess.check_output(["openssl", "x509",
+                                 "-req",
+                                 "-days", "3650",
+                                 "-signkey", '{}'.format(privkey_file),
+                                 "-in", '{}'.format(csr_file),
+                                 "-out", '{}'.format(cert_file)])
+        #CSR file is not needed anymore
+        os.remove(csr_file)
+    else:
+        print("Certificae or key already exists, refusing to overwrite")
+        return False
+    return True
+
+
 def box_start(args):
     """Starts a LayersBox"""
     dir = args.directory
@@ -168,8 +210,10 @@ def box_init(args):
     ssl_dir = join(dst, 'ssl/')
     if not os.path.exists(ssl_dir):
         os.makedirs(ssl_dir)
+    if not check_tls(dst, url):
+        print("No TLS certificate found, generating a self signed certificate")
+        generate_cert(join(dst, "ssl/"), url)
     print("Initializion complete.")
-    check_tls(dst, url)
     print("Make sure port 80 and 443 are not in use on this machine")
     print("You can start your LayersBox with 'layersbox start'")
     return 0
