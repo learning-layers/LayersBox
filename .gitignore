@@ -1,0 +1,5 @@
+LayersBox.egg-info/
+build/
+dist/
+docker-compose.yml
+common.env
