@@ -109,8 +109,11 @@ def check_tls(dst, url):
 
 def box_start(args):
     """Starts a LayersBox"""
+    dir = args.directory
     try:
-        read_url(args.directory)
+        url = read_url(args.directory)
+        if not check_tls(dir, url):
+            return 1
     except:
         print("This directory does not seem to contain a LayersBox")
         return 1
