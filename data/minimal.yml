@@ -9,7 +9,7 @@ adapter:
     volumes_from:
         - adapterdata
     volumes:
-        - ./ssl/:/usr/local/openresty/conf/ssl/
+        - ./ssl/:/usr/local/openresty/conf/ssl/:ro
         - ./logs/:/usr/local/openresty/logs/
         - ./html/:/usr/local/openresty/nginx/html/:ro
     env_file:
