@@ -186,13 +186,15 @@ def box_init(args):
     """Initializes a LayersBox"""
     print("Initializing LayersBox...")
     dst = args.directory
+    if not os.path.exists(dst):
+        os.makedirs(dst)
     url = "THIS SHOULD HAVE BEEN REPLACED"
     try:
         url = read_url(dst)
         print("Found existing configuration, using URL https://{}/".format(url))
     except:
         url = raw_input("Enter the URL the box should be reachable at. (Don't put a / at the end)\nhttps://").strip("/")
-        with open("common.env", 'w') as f:
+        with open(join(dst, "common.env"), 'w') as f:
             f.write("LAYERS_API_URI=https://{}/\n".format(url))
             f.write("LAYERS_API_URL=https://{}/\n".format(url))
             f.write("LAYERS_APP_URI=https://{}/\n".format(url))
