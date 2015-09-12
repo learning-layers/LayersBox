@@ -25,6 +25,7 @@ adapter:
         - adapterdata
     volumes:
         - ./ssl/:/usr/local/openresty/conf/ssl/
+        - ./logs/:/usr/local/openresty/logs/
     env_file:
         - common.env
     ports:
@@ -213,6 +214,8 @@ def box_init(args):
     print("Initializion complete.")
     print("Make sure port 80 and 443 are not in use on this machine")
     print("You can start your LayersBox with 'layersbox start'")
+    # Workaround for logs dir not being available in the adapterdata container
+    os.makedirs(join(dst, 'logs/'))
     return 0
 
 def parse_args():

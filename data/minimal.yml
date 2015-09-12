@@ -10,6 +10,7 @@ adapter:
         - adapterdata
     volumes:
         - ./ssl/:/usr/local/openresty/conf/ssl/
+        - ./logs/:/usr/local/openresty/logs/
     env_file:
         - common.env
     ports:
