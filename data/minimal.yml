@@ -3,14 +3,11 @@ adapterdata:
     image: learninglayers/adapter-data
     env_file:
         - common.env
-adapterservices:
-    image: learninglayers/adapter-externals
 adapter:
     container_name: adapter
     image: learninglayers/adapter
     volumes_from:
         - adapterdata
-        - adapterservices
     volumes:
         - ./ssl/:/usr/local/openresty/conf/ssl/
     env_file:
