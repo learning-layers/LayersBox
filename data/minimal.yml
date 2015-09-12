@@ -11,6 +11,7 @@ adapter:
     volumes:
         - ./ssl/:/usr/local/openresty/conf/ssl/
         - ./logs/:/usr/local/openresty/logs/
+        - ./html/:/usr/local/openresty/nginx/html/:ro
     env_file:
         - common.env
     ports:

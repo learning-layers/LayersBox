@@ -7,6 +7,8 @@ import sys
 import argparse
 import shutil
 import re
+import urllib2
+from zipfile import ZipFile
 
 programs = ["docker", "docker-compose"]
 yml = "docker-compose.yml"
@@ -26,6 +28,7 @@ adapter:
     volumes:
         - ./ssl/:/usr/local/openresty/conf/ssl/
         - ./logs/:/usr/local/openresty/logs/
+        - ./html/:/usr/local/openresty/nginx/html/:ro
     env_file:
         - common.env
     ports:
@@ -213,6 +216,17 @@ def box_init(args):
     if not check_tls(dst, url):
         print("No TLS certificate found, generating a self signed certificate")
         generate_cert(join(dst, "ssl/"), url)
+
+    # Downloading and unzippind the landing page
+    response = urllib2.urlopen('https://github.com/learning-layers/LayersAPI-LandingPage/releases/download/v1.0.0/dist.zip')
+    page_zip = join(dst, 'LandingPage.zip')
+    with open(page_zip, 'w') as f:
+        f.write(response.read())
+    with ZipFile(page_zip, 'r') as zip:
+        os.makedirs(join(dst, 'html/'))
+        zip.extractall(join(dst, 'html/'))
+    os.remove(page_zip)
+
     print("Initializion complete.")
     print("Make sure port 80 and 443 are not in use on this machine")
     print("You can start your LayersBox with 'layersbox start'")
