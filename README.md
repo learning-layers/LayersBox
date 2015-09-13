@@ -3,7 +3,7 @@ A command line script to setup and configure a Layers Box.
 
 # Installation
 1. Clone the repository
-2. run `python2 setup.py --user` to install the layersbox command for your current user
+2. run `python setup.py --user` to install the layersbox command for your current user
 
 # Usage
 * run `layersbox init` to turn a directory into a LayersBox
