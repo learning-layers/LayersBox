@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 import os
 from setuptools import setup
@@ -20,6 +20,7 @@ setup(
     keywords = "LayersBox",
     url = "https://github.com/learning-layers/LayersBox",
     scripts=['layersbox'],
+    requires=['pyyaml'],
     long_description=read('README.md'),
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

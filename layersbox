@@ -7,11 +7,15 @@ import sys
 import argparse
 import shutil
 import re
+import yaml
 import urllib2
+import six
+import copy
 from zipfile import ZipFile
 
 programs = ["docker", "docker-compose"]
-yml = "docker-compose.yml"
+base = "base.yml"
+conf = "box.yml"
 minimal = 'minimal.yml'
 # src = os.path.dirname(os.path.realpath(__file__))
 
@@ -71,17 +75,17 @@ def check_programs(programs):
             return False
     return True
 
-def read_url(dst):
+def read_url(dir):
     """Reads the LayersBox URL from the common.env file
 
     :dest: The directory of the LayersBox
     :returns: the LayersBox URL
 
     """
-    dst_env = join(dst, 'common.env')
+    dir_env = join(dir, 'common.env')
     try:
-        os.stat(dst_env)
-        with open(dst_env, 'r') as f:
+        os.stat(dir_env)
+        with open(dir_env, 'r') as f:
             lines = f.readlines()
             p = re.compile('^LAYERS_API_URI=https://(.*)/$')
             for line in lines:
@@ -92,26 +96,52 @@ def read_url(dst):
     except:
         raise
 
-def check_tls(dst, url):
+def read_config(dir):
+    """Reads the configuration from the config file
+
+    :dir: directory of the layers box
+    :returns: the configuration
+
+    """
+    conf_yaml = None
+    with open(join(dir, conf), 'r') as f:
+        conf_yaml = yaml.load(f.read())
+    if conf_yaml:
+        return conf_yaml
+    raise
+
+def write_config(dir, config):
+    """Writes the configuration to the config file
+
+    :dir: directory of the layers box
+    """
+    with open(join(dir, conf), 'w') as f:
+        f.write(yaml.dump(config))
+
+
+
+
+
+def check_tls(dir, url):
     """Checks if the TLS certificate and key are where they should be
 
     :dest: folder of the LayersBox
     :returns: True if everything is OK, False otherwise
 
     """
-    ssl_path = join(dst, 'ssl/')
+    ssl_path = join(dir, 'ssl/')
     try:
         os.stat(join(ssl_path, url + '.pem'))
         os.stat(join(ssl_path, url + '.key'))
         return True
     except:
-        print("Please put your TLS certificate {0}.pem and key {0}.key into {1}".format(url, join(dst, 'ssl/')))
+        print("Please put your TLS certificate {0}.pem and key {0}.key into {1}".format(url, join(dir, 'ssl/')))
         return False
 
-def generate_cert(dst, domain):
+def generate_cert(dir, domain):
     """Generates a self-signed TLS certificate
 
-    :dst: folder where the certificate and key should be placed
+    :dir: folder where the certificate and key should be placed
     :domain: domain for that the certificate will be valid
     :returns: True if successful, False otherwise
 
@@ -119,9 +149,9 @@ def generate_cert(dst, domain):
     if not which("openssl"):
         print("openssl is not installed! Can't generate a certificate.")
         return False
-    privkey_file = join(dst, domain + ".key")
-    csr_file = join(dst, domain + ".csr")
-    cert_file = join(dst, domain + ".pem")
+    privkey_file = join(dir, domain + ".key")
+    csr_file = join(dir, domain + ".csr")
+    cert_file = join(dir, domain + ".pem")
     subj= "/C=DE/ST=NRW/O=RWTH/localityName=Aachen/commonName={}/organizationalUnitName=ACIS/emailAddress=acis@dbis.rwth-aachen.de/"
     if not os.path.isfile(privkey_file):
         print("Generating key file {}".format(privkey_file))
@@ -149,7 +179,129 @@ def generate_cert(dst, domain):
         return False
     return True
 
+def merge_ymls(base, addon, name):
+    """Merges two yml files into one
 
+    :base: base yml data 
+    :addon: additional component data
+    :name: specifies the data that should be added from the addon
+    :returns: merged yml data
+
+    """
+    obj = addon[name]
+    needs = obj.has_key('needs') and obj.pop('needs') or []
+
+    merged = data_merge(base, {name: obj})
+
+    for need in needs:
+        if type(need) == str:
+            merged = merge_ymls(merged, addon, need)
+        elif type(need) == dict:
+            for k, v in need.iteritems():
+                addon[k] = v
+                merged = merge_ymls(merged, addon, k)
+        else:
+            print("Need is %s" % need)
+            raise
+
+class YamlReaderError(Exception):
+    pass
+
+def data_merge(a, b):
+    """merges b into a and return merged result
+    based on http://stackoverflow.com/questions/7204805/python-dictionaries-of-dictionaries-merge
+    and extended to also merge arrays and to replace the content of keys with the same name
+    NOTE: tuples and arbitrary objects are not handled as it is totally ambiguous what should happen"""
+    key = None
+    # ## debug output
+    # sys.stderr.write("DEBUG: %s to %s\n" %(b,a))
+    try:
+        if a is None or isinstance(a, (six.string_types, float, six.integer_types)):
+            # border case for first run or if a is a primitive
+            a = b
+        elif isinstance(a, list):
+            # lists can be only appended
+            if isinstance(b, list):
+                # merge lists
+                a.extend(b)
+            else:
+                # append to list
+                a.append(b)
+        elif isinstance(a, dict):
+            # dicts must be merged
+            if isinstance(b, dict):
+                for key in b:
+                    if key in a:
+                        a[key] = data_merge(a[key], b[key])
+                    else:
+                        a[key] = b[key]
+            else:
+                raise YamlReaderError('Cannot merge non-dict "%s" into dict "%s"' % (b, a))
+        else:
+            raise YamlReaderError('NOT IMPLEMENTED "%s" into "%s"' % (b, a))
+    except TypeError as e:
+        raise YamlReaderError('TypeError "%s" in key "%s" when merging "%s" into "%s"' % (e, key, b, a))
+    return a
+
+def generate_yml(dir):
+    """Generates a yml file for docker-compose
+
+    :dir: directory of the layersbox
+    """
+
+    base_config = None
+    with open(join(dir, base), 'r') as f:
+        base_config = yaml.load(f.read())
+
+    merged = copy.deepcopy(base_config)
+
+    config = read_config(dir)
+    modules = config['modules']
+    for addon_name, ymlfile in modules.iteritems():
+        with open(join(dir, ymlfile), 'r') as addon_file:
+            addon = yaml.load(addon_file.read())
+            merged = merge_ymls(merged, addon, addon_name)
+
+    print(yaml.dump(merged))
+    with open(join(dir, "docker-compose.yml"), 'w') as f:
+        f.write(yaml.dump(merged))
+
+
+def box_install(args):
+    """Adds a new component to a LayersBox
+
+    :args: parsed arguments
+    :returns: shell return code
+
+    """
+    dir = args.directory
+    addon_yml = args.layerfile
+    print("Addon yml: %s" % addon_yml)
+    addon_name = args.component
+    url = args.url
+    try:
+        check_yml(dir)
+    except:
+        print("This directory does not seem to contain the base.yml file")
+        return 1
+
+    if url:
+        response = urllib2.urlopen(addon_yml)
+        page_zip = join(dir, '%s.yml' % addon_name)
+        with open(page_zip, 'w') as f:
+            f.write(response.read())
+        addon_yml = '%s.yml' % addon_name
+    else:
+        shutil.copy(addon_yml, join(dir, "%s.yml" % addon_name))
+
+    config = read_config(dir)
+    modules = config['modules']
+    modules[addon_name] = addon_yml
+    write_config(dir, config)
+
+    generate_yml(dir)
+
+    return 0
 def box_start(args):
     """Starts a LayersBox"""
     dir = args.directory
@@ -161,6 +313,7 @@ def box_start(args):
         print("This directory does not seem to contain a LayersBox")
         return 1
     subprocess.check_output(["docker-compose", "up", "-d"])
+    print("You can reach LayersBox now at https://{}/".format(url))
     return 0
 
 def box_stop(args):
@@ -188,50 +341,55 @@ def box_ps(args):
 def box_init(args):
     """Initializes a LayersBox"""
     print("Initializing LayersBox...")
-    dst = args.directory
-    if not os.path.exists(dst):
-        os.makedirs(dst)
+    dir = args.directory
+    if not os.path.exists(dir):
+        os.makedirs(dir)
     url = "THIS SHOULD HAVE BEEN REPLACED"
     try:
-        url = read_url(dst)
+        url = read_url(dir)
         print("Found existing configuration, using URL https://{}/".format(url))
     except:
         url = raw_input("Enter the URL the box should be reachable at. (Don't put a / at the end)\nhttps://").strip("/")
-        with open(join(dst, "common.env"), 'w') as f:
+        with open(join(dir, "common.env"), 'w') as f:
             f.write("LAYERS_API_URI=https://{}/\n".format(url))
             f.write("LAYERS_API_URL=https://{}/\n".format(url))
             f.write("LAYERS_APP_URI=https://{}/\n".format(url))
-    dst_yml = join(dst, yml)
+    dir_yml = join(dir, base)
     try:
-        os.stat(dst_yml)
+        os.stat(dir_yml)
         print("Found docker-compose configuration")
     except:
         print("No docker configuration found, using minimal configuration")
-        with open(dst_yml, 'w') as f:
-            f.write(minimal_data)
+        with open(dir_yml, 'w') as f:
+            f.write(minimal_data2)
+    shutil.copy(dir_yml, join(dir, "docker-compose.yml"))
 
-    ssl_dir = join(dst, 'ssl/')
+    ssl_dir = join(dir, 'ssl/')
     if not os.path.exists(ssl_dir):
         os.makedirs(ssl_dir)
-    if not check_tls(dst, url):
+    if not check_tls(dir, url):
         print("No TLS certificate found, generating a self signed certificate")
-        generate_cert(join(dst, "ssl/"), url)
+        generate_cert(join(dir, "ssl/"), url)
 
     # Downloading and unzippind the landing page
     response = urllib2.urlopen('https://github.com/learning-layers/LayersAPI-LandingPage/releases/download/v1.0.0/dist.zip')
-    page_zip = join(dst, 'LandingPage.zip')
+    page_zip = join(dir, 'LandingPage.zip')
     with open(page_zip, 'w') as f:
         f.write(response.read())
     with ZipFile(page_zip, 'r') as zip:
-        os.makedirs(join(dst, 'html/'))
-        zip.extractall(join(dst, 'html/'))
+        os.makedirs(join(dir, 'html/'))
+        zip.extractall(join(dir, 'html/'))
     os.remove(page_zip)
+
+    config = {'modules': {}}
+    write_config(dir, config)
 
     print("Initializion complete.")
     print("Make sure port 80 and 443 are not in use on this machine")
     print("You can start your LayersBox with 'layersbox start'")
     # Workaround for logs dir not being available in the adapterdata container
-    os.makedirs(join(dst, 'logs/'))
+    os.makedirs(join(dir, 'logs/'))
+
     return 0
 
 def parse_args():
@@ -260,17 +418,26 @@ def parse_args():
     ps_parser.add_argument('--directory', '-d', action='store', help='Directory of the box', default='.')
     ps_parser.set_defaults(func=box_ps)
 
+    install_parser = subparsers.add_parser('install', help='Adds a component to th LayersBox')
+    install_parser.add_argument('layerfile', action='store', help='yml file containing dependency information', default='.')
+    install_parser.add_argument('component', action='store', help='Component to be installed from the yml file', default='.')
+    install_parser.add_argument('--directory', '-d', action='store', help='Directory of the box', default='.')
+    install_parser.add_argument('--url', '-u', action='store_true', help='Pass this if your box file is a URL', default=False)
+    install_parser.set_defaults(func=box_install)
+
     return parser.parse_args()
 
-def check_yml(dst):
-    """Check if docker-compose.yml exists
+def check_yml(dir):
+    """Check if base.yml exists
     :returns: True if it exists, False otherwise
     """
     try:
-        os.stat(join(dst, yml))
+        os.stat(join(dir, base))
+        return True
     except:
-        print("{} is missing in directory {}.".format(yml, dst))
+        print("{} is missing in directory {}.".format(base, dir))
         sys.exit(1)
+    return False
 
 
 def main():
