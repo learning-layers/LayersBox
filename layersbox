@@ -12,6 +12,7 @@ import urllib2
 import six
 import copy
 from zipfile import ZipFile
+import tarfile
 
 programs = ["docker", "docker-compose"]
 base = "base.yml"
@@ -38,6 +39,34 @@ adapter:
     ports:
         - "80:80"
         - "443:443"
+mysqldata:
+    image: gordinlearninglayers/mysql-data
+    env_file:
+        - common.env
+        - services/mysql/MYSQL.env
+    volumes:
+        - mysql-data/backup/:/backup
+mysql:
+    image: learninglayers/mysql
+    env_file:
+        - common.env
+        - services/mysql/MYSQL.env
+    volumes_from:
+        - mysqldata
+    # volumes:
+    #     - mysql/:/var/lib/mysql/
+    ports:
+        - "127.0.0.1:3307:3306"
+mysqlcreate:
+    image: gordinlearninglayers/mysql-create
+    links:
+        - mysql
+    env_file:
+        - common.env
+        - services/mysql/MYSQL.env
+        - secret.env
+    volumes:
+        - mysql-create/sqlfile/:/sqlfile/
 '''
 
 def which(program):
@@ -179,30 +208,32 @@ def generate_cert(dir, domain):
         return False
     return True
 
-def merge_ymls(base, addon, name):
+def merge_ymls(base, addon):
     """Merges two yml files into one
 
     :base: base yml data 
     :addon: additional component data
-    :name: specifies the data that should be added from the addon
     :returns: merged yml data
 
     """
-    obj = addon[name]
-    needs = obj.has_key('needs') and obj.pop('needs') or []
+    for name, obj in addon.copy().iteritems():
+        needs = obj.has_key('needs') and obj.pop('needs') or []
 
-    merged = data_merge(base, {name: obj})
+        merged = data_merge(base, {name: obj})
 
-    for need in needs:
-        if type(need) == str:
-            merged = merge_ymls(merged, addon, need)
-        elif type(need) == dict:
-            for k, v in need.iteritems():
-                addon[k] = v
-                merged = merge_ymls(merged, addon, k)
-        else:
-            print("Need is %s" % need)
-            raise
+        for need in needs:
+            if type(need) == str:
+                pass
+            elif type(need) == dict:
+                for k, v in need.iteritems():
+                    merged = merge_ymls(merged, {k: v})
+            else:
+                print("Need is {}".format(need))
+                raise
+    # print(merged)
+
+    return merged
+
 
 class YamlReaderError(Exception):
     pass
@@ -223,10 +254,13 @@ def data_merge(a, b):
             # lists can be only appended
             if isinstance(b, list):
                 # merge lists
-                a.extend(b)
+                for i in b:
+                    if not i in a:
+                        a.append(i)
             else:
                 # append to list
-                a.append(b)
+                if not b in a:
+                    a.append(b)
         elif isinstance(a, dict):
             # dicts must be merged
             if isinstance(b, dict):
@@ -236,11 +270,11 @@ def data_merge(a, b):
                     else:
                         a[key] = b[key]
             else:
-                raise YamlReaderError('Cannot merge non-dict "%s" into dict "%s"' % (b, a))
+                raise YamlReaderError('Cannot merge non-dict "{}" into dict "{}"'.format(b, a))
         else:
-            raise YamlReaderError('NOT IMPLEMENTED "%s" into "%s"' % (b, a))
+            raise YamlReaderError('NOT IMPLEMENTED "{}" into "{}"'.format(b, a))
     except TypeError as e:
-        raise YamlReaderError('TypeError "%s" in key "%s" when merging "%s" into "%s"' % (e, key, b, a))
+        raise YamlReaderError('TypeError "{}" in key "{}" when merging "{}" into "{}"'.format(e, key, b, a))
     return a
 
 def generate_yml(dir):
@@ -256,13 +290,14 @@ def generate_yml(dir):
     merged = copy.deepcopy(base_config)
 
     config = read_config(dir)
-    modules = config['modules']
-    for addon_name, ymlfile in modules.iteritems():
-        with open(join(dir, ymlfile), 'r') as addon_file:
+    services = config['services']
+    for service_name, service in services.iteritems():
+        service_yml = service['yml']
+        with open(join(dir, service_yml), 'r') as addon_file:
             addon = yaml.load(addon_file.read())
-            merged = merge_ymls(merged, addon, addon_name)
+            merged = merge_ymls(merged, addon)
 
-    print(yaml.dump(merged))
+    # print(yaml.dump(merged))
     with open(join(dir, "docker-compose.yml"), 'w') as f:
         f.write(yaml.dump(merged))
 
@@ -275,28 +310,46 @@ def box_install(args):
 
     """
     dir = args.directory
-    addon_yml = args.layerfile
-    print("Addon yml: %s" % addon_yml)
-    addon_name = args.component
-    url = args.url
+    repo = args.repository
+    owner, service_name = repo.split("/")
+    version = args.version or "master"
+    url = "https://github.com/{}/archive/{}.tar.gz".format(repo, version)
+
+    servicedir = join(dir, "services")
+    tmp_servicedir = join(dir, "tmp", "services")
+    
+    release_tar = join(tmp_servicedir, '{}-{}.tar.gz'.format(repo, version)).replace("/", "-")
+    addon_yml = join(servicedir, service_name, "service.yml")
+
     try:
         check_yml(dir)
     except:
-        print("This directory does not seem to contain the base.yml file")
+        print("This directory does not seem to contain a LayersBox")
         return 1
-
-    if url:
-        response = urllib2.urlopen(addon_yml)
-        page_zip = join(dir, '%s.yml' % addon_name)
-        with open(page_zip, 'w') as f:
+    
+    if version is "master" or not os.path.isfile(addon_yml):
+        if not os.path.exists(tmp_servicedir):
+            os.makedirs(tmp_servicedir)
+        if not os.path.exists(servicedir):
+            os.makedirs(servicedir)
+        response = urllib2.urlopen(url)
+        with open(release_tar, 'w') as f:
             f.write(response.read())
-        addon_yml = '%s.yml' % addon_name
-    else:
-        shutil.copy(addon_yml, join(dir, "%s.yml" % addon_name))
+        with tarfile.open(release_tar) as t:
+            if os.path.exists(join(dir, "services", service_name)):
+                shutil.rmtree(join(dir, "services", service_name))
+            os.makedirs(join(dir, "services", service_name))
+            dirname = list(x.name for x in t)[0]
+            t.extractall(path=servicedir)
+            os.rename(join(servicedir, dirname),join(servicedir, service_name) )
 
     config = read_config(dir)
-    modules = config['modules']
-    modules[addon_name] = addon_yml
+    services = config['services']
+    services[service_name] = {
+        'owner': owner,
+        'version': version,
+        'yml': addon_yml,
+    }
     write_config(dir, config)
 
     generate_yml(dir)
@@ -354,6 +407,11 @@ def box_init(args):
             f.write("LAYERS_API_URI=https://{}/\n".format(url))
             f.write("LAYERS_API_URL=https://{}/\n".format(url))
             f.write("LAYERS_APP_URI=https://{}/\n".format(url))
+        with open(join(dir, "secret.env"), 'w') as f:
+            f.write("\n".format(url))
+        os.makedirs(join(dir, "services", "mysql"))
+        with open(join(dir, "services", "mysql", "MYSQL.env"), 'w') as f:
+            f.write("MYSQL_ROOT_PASSWORD=pass")
     dir_yml = join(dir, base)
     try:
         os.stat(dir_yml)
@@ -381,7 +439,7 @@ def box_init(args):
         zip.extractall(join(dir, 'html/'))
     os.remove(page_zip)
 
-    config = {'modules': {}}
+    config = {'services': {}}
     write_config(dir, config)
 
     print("Initializion complete.")
@@ -419,10 +477,9 @@ def parse_args():
     ps_parser.set_defaults(func=box_ps)
 
     install_parser = subparsers.add_parser('install', help='Adds a component to th LayersBox')
-    install_parser.add_argument('layerfile', action='store', help='yml file containing dependency information', default='.')
-    install_parser.add_argument('component', action='store', help='Component to be installed from the yml file', default='.')
+    install_parser.add_argument('repository', action='store', help='Github repository of the service. Example: "owner/repo"')
+    install_parser.add_argument('--version', '-v', action='store', help='The version of a release of the service. Example: "0.4.0', default='master')
     install_parser.add_argument('--directory', '-d', action='store', help='Directory of the box', default='.')
-    install_parser.add_argument('--url', '-u', action='store_true', help='Pass this if your box file is a URL', default=False)
     install_parser.set_defaults(func=box_install)
 
     return parser.parse_args()
