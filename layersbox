@@ -330,8 +330,11 @@ def box_install(args):
     """
     dir = args.directory
     repo = args.repository
+    if "#" in repo:
+        repo, version = repo.split("#")
+    else:
+        version = "master"
     owner, service_name = repo.split("/")
-    version = args.version or "master"
     url = "https://github.com/{}/archive/{}.tar.gz".format(repo, version)
 
     servicedir = join(dir, "services")
