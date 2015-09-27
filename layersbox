@@ -2,7 +2,6 @@
 
 import subprocess
 import os
-join = os.path.join
 import sys
 import argparse
 import shutil
@@ -13,6 +12,8 @@ import six
 import copy
 from zipfile import ZipFile
 import tarfile
+
+join = os.path.join
 
 programs = ["docker", "docker-compose"]
 base = "base.yml"
@@ -69,8 +70,10 @@ mysqlcreate:
         - mysql-create/sqlfile/:/sqlfile/
 '''
 
+
 def which(program):
-    """Emulates the 'which' utility and checks wether a program exists in PATH and is executable
+    """Emulates the 'which' utility.
+    Checks wether a program exists in PATH and is executable
 
     :program: String containing the name of the program
     :returns: True if the program exists and is executable, False otherwise
@@ -91,6 +94,7 @@ def which(program):
 
     return None
 
+
 def check_programs(programs):
     """Checks if given programs are in PATH
 
@@ -103,6 +107,7 @@ def check_programs(programs):
             print("% is not installed! Exiting.".format(p))
             return False
     return True
+
 
 def read_url(dir):
     """Reads the LayersBox URL from the common.env file
@@ -125,6 +130,7 @@ def read_url(dir):
     except:
         raise
 
+
 def read_config(dir):
     """Reads the configuration from the config file
 
@@ -139,6 +145,7 @@ def read_config(dir):
         return conf_yaml
     raise
 
+
 def write_config(dir, config):
     """Writes the configuration to the config file
 
@@ -146,9 +153,6 @@ def write_config(dir, config):
     """
     with open(join(dir, conf), 'w') as f:
         f.write(yaml.dump(config))
-
-
-
 
 
 def check_tls(dir, url):
@@ -164,8 +168,10 @@ def check_tls(dir, url):
         os.stat(join(ssl_path, url + '.key'))
         return True
     except:
-        print("Please put your TLS certificate {0}.pem and key {0}.key into {1}".format(url, join(dir, 'ssl/')))
+        print("Please put your TLS certificate {0}.pem and key {0}.key in {1}"
+              .format(url, join(dir, 'ssl/')))
         return False
+
 
 def generate_cert(dir, domain):
     """Generates a self-signed TLS certificate
@@ -181,7 +187,9 @@ def generate_cert(dir, domain):
     privkey_file = join(dir, domain + ".key")
     csr_file = join(dir, domain + ".csr")
     cert_file = join(dir, domain + ".pem")
-    subj= "/C=DE/ST=NRW/O=RWTH/localityName=Aachen/commonName={}/organizationalUnitName=ACIS/emailAddress=acis@dbis.rwth-aachen.de/"
+    subj = "/C=DE/ST=NRW/O=RWTH/localityName=Aachen/" +\
+           "commonName={}/organizationalUnitName=ACIS/" +\
+           "emailAddress=acis@dbis.rwth-aachen.de/"
     if not os.path.isfile(privkey_file):
         print("Generating key file {}".format(privkey_file))
         subprocess.check_output(["openssl", "genrsa",
@@ -201,23 +209,24 @@ def generate_cert(dir, domain):
                                  "-signkey", '{}'.format(privkey_file),
                                  "-in", '{}'.format(csr_file),
                                  "-out", '{}'.format(cert_file)])
-        #CSR file is not needed anymore
+        # CSR file is not needed anymore
         os.remove(csr_file)
     else:
         print("Certificae or key already exists, refusing to overwrite")
         return False
     return True
 
+
 def merge_ymls(base, addon):
     """Merges two yml files into one
 
-    :base: base yml data 
+    :base: base yml data
     :addon: additional component data
     :returns: merged yml data
 
     """
     for name, obj in addon.copy().iteritems():
-        needs = obj.has_key('needs') and obj.pop('needs') or []
+        needs = obj. has_key('needs') and obj.pop('needs') or []
 
         merged = data_merge(base, {name: obj})
 
@@ -238,16 +247,21 @@ def merge_ymls(base, addon):
 class YamlReaderError(Exception):
     pass
 
+
 def data_merge(a, b):
     """merges b into a and return merged result
-    based on http://stackoverflow.com/questions/7204805/python-dictionaries-of-dictionaries-merge
-    and extended to also merge arrays and to replace the content of keys with the same name
-    NOTE: tuples and arbitrary objects are not handled as it is totally ambiguous what should happen"""
+    based on
+    http://stackoverflow.com/questions/7204805/python-dictionaries-of-dictionaries-merge
+    and extended to also merge arrays and to replace the content of keys with
+    the same name
+    NOTE: tuples and arbitrary objects are not handled as it is totally
+    ambiguous what should happen"""
     key = None
     # ## debug output
     # sys.stderr.write("DEBUG: %s to %s\n" %(b,a))
     try:
-        if a is None or isinstance(a, (six.string_types, float, six.integer_types)):
+        if a is None or isinstance(a, (six.string_types, float,
+                                       six.integer_types)):
             # border case for first run or if a is a primitive
             a = b
         elif isinstance(a, list):
@@ -255,11 +269,11 @@ def data_merge(a, b):
             if isinstance(b, list):
                 # merge lists
                 for i in b:
-                    if not i in a:
+                    if i not in a:
                         a.append(i)
             else:
                 # append to list
-                if not b in a:
+                if b not in a:
                     a.append(b)
         elif isinstance(a, dict):
             # dicts must be merged
@@ -270,12 +284,17 @@ def data_merge(a, b):
                     else:
                         a[key] = b[key]
             else:
-                raise YamlReaderError('Cannot merge non-dict "{}" into dict "{}"'.format(b, a))
+                raise YamlReaderError(
+                    'Cannot merge non-dict "{}" into dict "{}"'.format(b, a))
         else:
-            raise YamlReaderError('NOT IMPLEMENTED "{}" into "{}"'.format(b, a))
+            raise YamlReaderError(
+                'NOT IMPLEMENTED "{}" into "{}"'.format(b, a))
     except TypeError as e:
-        raise YamlReaderError('TypeError "{}" in key "{}" when merging "{}" into "{}"'.format(e, key, b, a))
+        raise YamlReaderError(
+            'TypeError "{}" in key "{}" when merging "{}" into "{}"'
+            .format(e, key, b, a))
     return a
+
 
 def generate_yml(dir):
     """Generates a yml file for docker-compose
@@ -317,8 +336,9 @@ def box_install(args):
 
     servicedir = join(dir, "services")
     tmp_servicedir = join(dir, "tmp", "services")
-    
-    release_tar = join(tmp_servicedir, '{}-{}.tar.gz'.format(repo, version)).replace("/", "-")
+
+    release_tar = join(tmp_servicedir,
+                       '{}-{}.tar.gz'.format(repo, version)).replace("/", "-")
     addon_yml = join(servicedir, service_name, "service.yml")
 
     try:
@@ -326,7 +346,7 @@ def box_install(args):
     except:
         print("This directory does not seem to contain a LayersBox")
         return 1
-    
+
     if version is "master" or not os.path.isfile(addon_yml):
         if not os.path.exists(tmp_servicedir):
             os.makedirs(tmp_servicedir)
@@ -341,7 +361,8 @@ def box_install(args):
             os.makedirs(join(dir, "services", service_name))
             dirname = list(x.name for x in t)[0]
             t.extractall(path=servicedir)
-            os.rename(join(servicedir, dirname),join(servicedir, service_name) )
+            os.rename(join(servicedir, dirname),
+                      join(servicedir, service_name))
 
     config = read_config(dir)
     services = config['services']
@@ -355,6 +376,8 @@ def box_install(args):
     generate_yml(dir)
 
     return 0
+
+
 def box_start(args):
     """Starts a LayersBox"""
     dir = args.directory
@@ -369,6 +392,7 @@ def box_start(args):
     print("You can reach LayersBox now at https://{}/".format(url))
     return 0
 
+
 def box_stop(args):
     """Stops a LayersBox"""
     try:
@@ -379,17 +403,18 @@ def box_stop(args):
     subprocess.check_output(["docker-compose", "stop"])
     return 0
 
+
 def box_logs(args):
     """Shows logs of a LayersBox"""
-    dir = args.directory
     subprocess.check_output(["docker-compose", "logs"])
     return 0
 
+
 def box_ps(args):
     """Shows the states of the services inside the LayersBox"""
-    dir = args.directory
-    print (subprocess.check_output(["docker-compose", "ps"]))
+    print(subprocess.check_output(["docker-compose", "ps"]))
     return 0
+
 
 def box_init(args):
     """Initializes a LayersBox"""
@@ -400,9 +425,12 @@ def box_init(args):
     url = "THIS SHOULD HAVE BEEN REPLACED"
     try:
         url = read_url(dir)
-        print("Found existing configuration, using URL https://{}/".format(url))
+        print("Found existing configuration, using URL https://{}/"
+              .format(url))
     except:
-        url = raw_input("Enter the URL the box should be reachable at. (Don't put a / at the end)\nhttps://").strip("/")
+        url = raw_input(
+            "Enter the URL the box should be reachable at. \
+            (Don't put a / at the end)\nhttps://").strip("/")
         with open(join(dir, "common.env"), 'w') as f:
             f.write("LAYERS_API_URI=https://{}/\n".format(url))
             f.write("LAYERS_API_URL=https://{}/\n".format(url))
@@ -419,7 +447,7 @@ def box_init(args):
     except:
         print("No docker configuration found, using minimal configuration")
         with open(dir_yml, 'w') as f:
-            f.write(minimal_data2)
+            f.write(minimal_data)
     shutil.copy(dir_yml, join(dir, "docker-compose.yml"))
 
     ssl_dir = join(dir, 'ssl/')
@@ -430,7 +458,9 @@ def box_init(args):
         generate_cert(join(dir, "ssl/"), url)
 
     # Downloading and unzippind the landing page
-    response = urllib2.urlopen('https://github.com/learning-layers/LayersAPI-LandingPage/releases/download/v1.0.0/dist.zip')
+    response = urllib2.urlopen(
+        'https://github.com/learning-layers/LayersAPI-LandingPage/releases/' +
+        'download/v1.0.0/dist.zip')
     page_zip = join(dir, 'LandingPage.zip')
     with open(page_zip, 'w') as f:
         f.write(response.read())
@@ -450,39 +480,58 @@ def box_init(args):
 
     return 0
 
+
 def parse_args():
     """Parses the command line arguments to choose which action should be taken
     """
     parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(help='commands (use "layersbox -h command" to find out about their parameters)', dest='command')
+    subparsers = parser.add_subparsers(
+        help='commands (use "layersbox -h command" to find out about their \
+        parameters)',
+        dest='command')
 
     start_parser = subparsers.add_parser('start', help='Starts the LayersBox')
-    start_parser.add_argument('--directory', '-d', action='store', help='Directory of the box', default='.')
+    start_parser.add_argument('--directory', '-d', action='store',
+                              help='Directory of the box', default='.')
     start_parser.set_defaults(func=box_start)
 
-    stop_parser  = subparsers.add_parser("stop", help="Stops the LayersBox")
-    stop_parser.add_argument('--directory', '-d', action='store', help='Directory of the box', default='.')
+    stop_parser = subparsers.add_parser("stop", help="Stops the LayersBox")
+    stop_parser.add_argument('--directory', '-d', action='store',
+                             help='Directory of the box', default='.')
     stop_parser.set_defaults(func=box_stop)
 
-    init_parser  = subparsers.add_parser("init", help="Initializes a LayersBox in the current directory")
-    init_parser.add_argument('--directory', '-d', action='store', help='The directory to use', default='.')
+    init_parser = subparsers.add_parser(
+        "init",
+        help="Initializes a LayersBox in the current directory")
+    init_parser.add_argument(
+        '--directory', '-d', action='store',
+        help='The directory to use', default='.')
     init_parser.set_defaults(func=box_init)
 
-    # logs_parser = subparsers.add_parser('logs', help='Shows logs of the LayersBox')
-    # logs_parser.add_argument('--directory', '-d', action='store', help='Directory of the box', default='.')
+    # logs_parser = subparsers.add_parser(
+    #     'logs', help='Shows logs of the LayersBox')
+    # logs_parser.add_argument('--directory', '-d', action='store',
+    #                          help='Directory of the box', default='.')
     # logs_parser.set_defaults(func=box_logs)
 
-    ps_parser = subparsers.add_parser('status', help='Shows the states of the services inside the LayersBox')
-    ps_parser.add_argument('--directory', '-d', action='store', help='Directory of the box', default='.')
+    ps_parser = subparsers.add_parser(
+        'status',
+        help='Shows the states of the services inside the LayersBox')
+    ps_parser.add_argument('--directory', '-d', action='store',
+                           help='Directory of the box', default='.')
     ps_parser.set_defaults(func=box_ps)
 
-    install_parser = subparsers.add_parser('install', help='Adds a component to th LayersBox')
-    install_parser.add_argument('repository', action='store', help='Github repository of the service. Example: "owner/repo"')
-    install_parser.add_argument('--version', '-v', action='store', help='The version of a release of the service. Example: "0.4.0', default='master')
-    install_parser.add_argument('--directory', '-d', action='store', help='Directory of the box', default='.')
+    install_parser = subparsers.add_parser(
+        'install', help='Adds a component to th LayersBox')
+    install_parser.add_argument(
+        'repository', action='store',
+        help='Github repository of the service. Example: "owner/repo#version"')
+    install_parser.add_argument('--directory', '-d', action='store',
+                                help='Directory of the box', default='.')
     install_parser.set_defaults(func=box_install)
 
     return parser.parse_args()
+
 
 def check_yml(dir):
     """Check if base.yml exists
@@ -502,7 +551,6 @@ def main():
     """
     if not check_programs(programs):
         sys.exit(1)
-
 
     parsed = parse_args()
     sys.exit(parsed.func(parsed))
