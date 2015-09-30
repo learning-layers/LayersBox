@@ -46,7 +46,7 @@ mysqldata:
         - common.env
         - services/mysql/MYSQL.env
     volumes:
-        - mysql-data/backup/:/backup
+        - ./mysql-data/backup/:/backup
 mysql:
     image: learninglayers/mysql
     env_file:
@@ -55,7 +55,7 @@ mysql:
     volumes_from:
         - mysqldata
     # volumes:
-    #     - mysql/:/var/lib/mysql/
+    #     - ./mysql/:/var/lib/mysql/
     ports:
         - "127.0.0.1:3307:3306"
 mysqlcreate:
@@ -65,9 +65,9 @@ mysqlcreate:
     env_file:
         - common.env
         - services/mysql/MYSQL.env
-        - secret.env
+        - tmp/secret.env
     volumes:
-        - mysql-create/sqlfile/:/sqlfile/
+        - ./tmp/sqlfile/:/sqlfile/
 '''
 
 
@@ -217,7 +217,7 @@ def generate_cert(dir, domain):
     return True
 
 
-def merge_ymls(base, addon):
+def merge_ymls(base, addon, databases=[]):
     """Merges two yml files into one
 
     :base: base yml data
@@ -226,7 +226,7 @@ def merge_ymls(base, addon):
 
     """
     for name, obj in addon.copy().iteritems():
-        needs = obj. has_key('needs') and obj.pop('needs') or []
+        needs = 'needs' in obj and obj.pop('needs') or []
 
         merged = data_merge(base, {name: obj})
 
@@ -235,13 +235,17 @@ def merge_ymls(base, addon):
                 pass
             elif type(need) == dict:
                 for k, v in need.iteritems():
-                    merged = merge_ymls(merged, {k: v})
+                    if k == "create_databases":
+                        print("Added database {}".format(v))
+                        databases.append(v)
+                    else:
+                        merged, databases = merge_ymls(merged, {k: v}, databases)
             else:
                 print("Need is {}".format(need))
                 raise
     # print(merged)
 
-    return merged
+    return merged, databases
 
 
 class YamlReaderError(Exception):
@@ -310,15 +314,24 @@ def generate_yml(dir):
 
     config = read_config(dir)
     services = config['services']
+    databases = []
     for service_name, service in services.iteritems():
         service_yml = service['yml']
         with open(join(dir, service_yml), 'r') as addon_file:
             addon = yaml.load(addon_file.read())
-            merged = merge_ymls(merged, addon)
+            merged, more_databases = merge_ymls(merged, addon)
+            databases.extend(more_databases)
 
     # print(yaml.dump(merged))
     with open(join(dir, "docker-compose.yml"), 'w') as f:
         f.write(yaml.dump(merged))
+
+    if databases:
+        with open(join(dir, "databases"), 'w') as f:
+            for dbs in databases:
+                for db in dbs:
+                    f.write("{}\n".format(db))
+
 
 
 def box_install(args):
@@ -438,7 +451,8 @@ def box_init(args):
             f.write("LAYERS_API_URI=https://{}/\n".format(url))
             f.write("LAYERS_API_URL=https://{}/\n".format(url))
             f.write("LAYERS_APP_URI=https://{}/\n".format(url))
-        with open(join(dir, "secret.env"), 'w') as f:
+        os.makedirs(join(dir, "tmp"))
+        with open(join(dir, "tmp", "secret.env"), 'w') as f:
             f.write("\n".format(url))
         os.makedirs(join(dir, "services", "mysql"))
         with open(join(dir, "services", "mysql", "MYSQL.env"), 'w') as f:

@@ -19,7 +19,7 @@ setup(
     license = "BSD",
     keywords = "LayersBox",
     url = "https://github.com/learning-layers/LayersBox",
-    scripts=['layersbox'],
+    scripts=['layersbox', "setup_databases.sh"],
     requires=['pyyaml'],
     long_description=read('README.md'),
     classifiers=[
