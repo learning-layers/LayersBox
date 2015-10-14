@@ -525,11 +525,11 @@ def parse_args():
         help='The directory to use', default='.')
    # init_parser.add_argument(
    #     '--version', '-v', action='store', nargs=1,
-   #     help='The tag to use')
+   #     help='The version to use; incompatible with the "-t" option.')
 
    # init_parser.add_argument(
    #     '--tag', '-t', action='store', nargs=1,
-   #     help='The tag to use', default='latest')
+   #     help='The tag to use; incompatible with the "-v" option.', default='latest')
 
    # gr = parser.add_mutually_exclusive_group()
    # gr.add_argument("-v", "--version")
