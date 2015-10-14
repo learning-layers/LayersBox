@@ -531,6 +531,10 @@ def parse_args():
    #     '--tag', '-t', action='store', nargs=1,
    #     help='The tag to use', default='latest')
 
+   # gr = parser.add_mutually_exclusive_group()
+   # gr.add_argument("-v", "--version")
+   # gr.add_argument("-t", "--tag")
+
 
     init_parser.set_defaults(func=box_init)
 
