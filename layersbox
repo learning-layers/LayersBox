@@ -523,6 +523,10 @@ def parse_args():
     init_parser.add_argument(
         '--directory', '-d', action='store',
         help='The directory to use', default='.')
+   # init_parser.add_argument(
+   #     '--version', '-v', action='store',
+   #     help='The version/tag to use', default='latest')
+
     init_parser.set_defaults(func=box_init)
 
     # logs_parser = subparsers.add_parser(
