@@ -525,7 +525,12 @@ def parse_args():
         help='The directory to use', default='.')
    # init_parser.add_argument(
    #     '--version', '-v', action='store', nargs=1,
-   #     help='The version/tag to use', default='latest')
+   #     help='The tag to use')
+
+   # init_parser.add_argument(
+   #     '--tag', '-t', action='store', nargs=1,
+   #     help='The tag to use', default='latest')
+
 
     init_parser.set_defaults(func=box_init)
 
