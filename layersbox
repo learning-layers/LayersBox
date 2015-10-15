@@ -347,6 +347,9 @@ def box_install(args):
     #tag = args.tag
     if "#" in repo:
         repo, version = repo.split("#")
+    ##If tag specified instead of a version, treat the tag as the new version.
+    #elif version == None and tag != None:
+    #    version = tag
     else:
         version = "master"
     owner, service_name = repo.split("/")
