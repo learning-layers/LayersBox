@@ -528,18 +528,6 @@ def parse_args():
     init_parser.add_argument(
         '--directory', '-d', action='store',
         help='The directory to use', default='.')
-   # init_parser.add_argument(
-   #     '--version', '-v', action='store', nargs=1,
-   #     help='The version to use; incompatible with the "-t" option.')
-
-   # init_parser.add_argument(
-   #     '--tag', '-t', action='store', nargs=1,
-   #     help='The tag to use; incompatible with the "-v" option.', default='latest')
-
-   # gr = parser.add_mutually_exclusive_group()
-   # gr.add_argument("-v", "--version")
-   # gr.add_argument("-t", "--tag")
-
 
     init_parser.set_defaults(func=box_init)
 
@@ -563,6 +551,18 @@ def parse_args():
         help='Github repository of the service. Example: "owner/repo#version"')
     install_parser.add_argument('--directory', '-d', action='store',
                                 help='Directory of the box', default='.')
+   # install_parser.add_argument(
+   #     '--version', '-v', action='store', nargs=1,
+   #     help='The version to use; incompatible with the "-t" option.')
+
+   # install_parser.add_argument(
+   #     '--tag', '-t', action='store', nargs=1,
+   #     help='The tag to use; incompatible with the "-v" option.', default='latest')
+
+   # gr = parser.add_mutually_exclusive_group()
+   # gr.add_argument("-v", "--version")
+   # gr.add_argument("-t", "--tag")
+
     install_parser.set_defaults(func=box_install)
 
     return parser.parse_args()
