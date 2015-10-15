@@ -343,6 +343,7 @@ def box_install(args):
     """
     dir = args.directory
     repo = args.repository
+    #version = args.version
     if "#" in repo:
         repo, version = repo.split("#")
     else:
