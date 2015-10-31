@@ -499,7 +499,6 @@ def box_init(args):
             (Don't put a / at the end)\nhttps://").strip("/")
         with open(join(dir, "common.env"), 'w') as f:
             f.write("LAYERS_API_URI=https://{}/\n".format(url))
-            f.write("LAYERS_API_URL=https://{}/\n".format(url))
             f.write("LAYERS_APP_URI=https://{}/\n".format(url))
         os.makedirs(join(dir, "tmp"))
         with open(join(dir, "tmp", "secret.env"), 'w') as f:
