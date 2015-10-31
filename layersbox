@@ -23,12 +23,12 @@ minimal = 'minimal.yml'
 
 minimal_data = '''adapterdata:
     container_name: adapter-data
-    image: learninglayers/adapter-data
+    image: learninglayers/adapter-data:0.0.1
     env_file:
         - common.env
 adapter:
     container_name: adapter
-    image: learninglayers/adapter
+    image: learninglayers/adapter:0.0.1
     volumes_from:
         - adapterdata
     volumes:
@@ -48,7 +48,7 @@ mysqldata:
     volumes:
         - ./mysql-data/backup/:/backup
 mysql:
-    image: learninglayers/mysql
+    image: learninglayers/mysql:0.0.1
     env_file:
         - common.env
         - services/mysql/MYSQL.env
