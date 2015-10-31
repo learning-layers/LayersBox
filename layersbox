@@ -41,7 +41,7 @@ adapter:
         - "80:80"
         - "443:443"
 mysqldata:
-    image: gordinlearninglayers/mysql-data
+    image: learninglayers/mysql-data:0.0.1
     env_file:
         - common.env
         - services/mysql/MYSQL.env
@@ -59,7 +59,7 @@ mysql:
     ports:
         - "127.0.0.1:3307:3306"
 mysqlcreate:
-    image: gordinlearninglayers/mysql-create
+    image: learninglayers/mysql-create:0.0.1
     links:
         - mysql
     env_file:
@@ -225,13 +225,22 @@ def merge_ymls(base, addon, databases=[]):
     :returns: merged yml data
 
     """
+    # top level containers, that is names like "mysql" and "mysql-data".
+    # "name" is the container name, "obj" contains the settings
     for name, obj in addon.copy().iteritems():
+        # if there is a key called "needs" then return its value, otherwise return empty list
         needs = 'needs' in obj and obj.pop('needs') or []
 
+        # merges each container of the new service's docker-compose.yml into the base.yml
         merged = data_merge(base, {name: obj})
 
+        # the following code makes basically sure, that databases are created and
+        # that the adapter is linking to all containers.
         for need in needs:
+            # if it is a container name, do nothing
             if type(need) == str:
+                # pass is required in python when a command is required syntactically
+                # but nothing needs to be done
                 pass
             elif type(need) == dict:
                 for k, v in need.iteritems():
@@ -301,7 +310,8 @@ def data_merge(a, b):
 
 
 def generate_yml(dir):
-    """Generates a yml file for docker-compose
+    """Generates a yml file for docker-compose with the base services
+    and all installed ones.
 
     :dir: directory of the layersbox
     """
@@ -312,14 +322,21 @@ def generate_yml(dir):
 
     merged = copy.deepcopy(base_config)
 
+    # reads in config file that contains all installed services
     config = read_config(dir)
     services = config['services']
     databases = []
+    # for with service_name e.g. being "documentation" and service the value of the
+    # service called "documentation"
     for service_name, service in services.iteritems():
+        # read in the yml file of the service (docker-compose.yml)
         service_yml = service['yml']
+        # open docker-compose.yml file for each service
         with open(join(dir, service_yml), 'r') as addon_file:
             addon = yaml.load(addon_file.read())
+            # merged is the base one
             merged, more_databases = merge_ymls(merged, addon)
+            # "extend" extends list by appending elements from the iterable
             databases.extend(more_databases)
 
     # print(yaml.dump(merged))
@@ -341,6 +358,7 @@ def box_install(args):
     :returns: shell return code
 
     """
+    # the following two lines come from the command line
     dir = args.directory
     repo = args.repository
     #version = args.version
@@ -353,14 +371,14 @@ def box_install(args):
     else:
         version = "master"
     owner, service_name = repo.split("/")
-    url = "https://github.com/{}/archive/{}.tar.gz".format(repo, version)
+    url = "https://github.com/{}-Dockerfiles/archive/{}.tar.gz".format(repo, version)
 
     servicedir = join(dir, "services")
     tmp_servicedir = join(dir, "tmp", "services")
 
     release_tar = join(tmp_servicedir,
-                       '{}-{}.tar.gz'.format(repo, version)).replace("/", "-")
-    addon_yml = join(servicedir, service_name, "service.yml")
+                       '{}-{}.tar.gz'.format(repo, version).replace("/", "-"))
+    addon_yml = join(servicedir, service_name, "docker-compose.yml")
 
     try:
         check_yml(dir)
@@ -368,7 +386,9 @@ def box_install(args):
         print("This directory does not seem to contain a LayersBox")
         return 1
 
+    # only download release if it was not yet downloaded
     if version is "master" or not os.path.isfile(addon_yml):
+        # check if "services" directory is already existing, if not, create it
         if not os.path.exists(tmp_servicedir):
             os.makedirs(tmp_servicedir)
         if not os.path.exists(servicedir):
@@ -385,6 +405,7 @@ def box_install(args):
             os.rename(join(servicedir, dirname),
                       join(servicedir, service_name))
 
+    # read base.yml which contains the minimal Layers Box
     config = read_config(dir)
     services = config['services']
     services[service_name] = {
@@ -545,7 +566,7 @@ def parse_args():
     ps_parser.set_defaults(func=box_ps)
 
     install_parser = subparsers.add_parser(
-        'install', help='Adds a component to th LayersBox')
+        'install', help='Adds a component to the LayersBox')
     install_parser.add_argument(
         'repository', action='store',
         help='Github repository of the service. Example: "owner/repo#version"')
