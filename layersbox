@@ -556,13 +556,14 @@ def parse_args():
         parameters)',
         dest='command')
 
-    # for debugging purposes
-    if parser.verbose:
-        log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
-        log.info("Verbose output.")
-    else:
-        log.basicConfig(format="%(levelname)s: %(message)s")
-    #log.info("Example message when -v specified at command line.")
+    ## for debugging purposes
+    #args = parser.parse_args()
+    #if parser.verbose:
+    #    log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
+    #    log.info("Verbose output.")
+    #else:
+    #    log.basicConfig(format="%(levelname)s: %(message)s")
+    ##log.info("Example message when -v specified at command line.")
 
     start_parser = subparsers.add_parser('start', help='Starts the LayersBox')
     start_parser.add_argument('--directory', '-d', action='store',
