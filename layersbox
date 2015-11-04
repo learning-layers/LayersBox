@@ -12,7 +12,7 @@ import six
 import copy
 from zipfile import ZipFile
 import tarfile
-
+import logging as log 
 join = os.path.join
 
 programs = ["docker", "docker-compose"]
@@ -555,6 +555,14 @@ def parse_args():
         help='commands (use "layersbox -h command" to find out about their \
         parameters)',
         dest='command')
+
+    # for debugging purposes
+    if parser.verbose:
+        log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
+        log.info("Verbose output.")
+    else:
+        log.basicConfig(format="%(levelname)s: %(message)s")
+    #log.info("Example message when -v specified at command line.")
 
     start_parser = subparsers.add_parser('start', help='Starts the LayersBox')
     start_parser.add_argument('--directory', '-d', action='store',
