@@ -436,7 +436,7 @@ def box_install(args):
             print("The following location will be added to the Adapter: " + entry_name)
             replacements = {'http://' + entry_name :'http://' + container_ip}
 
-        for entry_name in entries_list.iteritems():
+        for entry_name in entries_list:
             for src, target in replacements.iteritems():
                 line = line.replace(src, target)
             outfile.write(line)
