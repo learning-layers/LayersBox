@@ -4,7 +4,11 @@
 if [ $# -le 1 ]
  then
 	sn=$1
-	echo "The new service is called $sn ."
+	echo "The new service is called '$sn' ."
+	 elif [ $# -eq 0 ]
+          then
+		echo "No arguments passed to setup script. Aborting..."
+		exit 1 
  else
 	echo "Too many service names specified! Aborting..."
 	exit 1
@@ -33,12 +37,12 @@ if [ $out -gt 0 ]
 
 	docker exec adapter mkdir -p $nsv/
 
-	sf="nginx.conf"
+	sf="nginx.${sn}conf"
 	if [ -f $sf ] 
 	 then 
 		echo "Service's nginx.conf found."
 		echo "Copying service's nginx.conf to newly created path $nsv..."
-		docker cp ./services/documentation/nginx.documentation.conf adapter-data:$nsv
+		docker cp ./services/documentation/${sf} adapter-data:$nsv
 	 else
 		echo "No configuration file found! Current directory should contain it and the file must be named 'nginx.conf'. Aborting..."
 		exit 1
