@@ -21,17 +21,29 @@ if [ $out -gt 0 ]
 	nsv=$td/documentation
 	osv=$(docker exec adapter ls $nsv)	
 	
-	if [ -z "$osv"  ]
+	if [ -z $osv  ]
 	 then 
 		echo "No previous configuration for this service found. Proceeding with setup..."
+		echo "Creating path for new dir..."	
 	 else
 		echo "Previous configuration detected. Deleting old configuration..."
 		docker exec adapter rm -rf $osv
+		echo "Recreating path for new dir..."	
 	fi
-	
+
 	docker exec adapter mkdir -p $nsv/
-	echo "Copying service's nginx.conf to newly created path $nsv..."
-	docker cp ./services/documentation/nginx.documentation.conf adapter-data:$nsv
+
+	sf="nginx.conf"
+	if [ -f $sf ] 
+	 then 
+		echo "Service's nginx.conf found."
+		echo "Copying service's nginx.conf to newly created path $nsv..."
+		docker cp ./services/documentation/nginx.documentation.conf adapter-data:$nsv
+	 else
+		echo "No configuration file found! Current directory should contain it and the file must be named 'nginx.conf'. Aborting..."
+		exit 1
+	fi
+
 	echo "Loading newly copied configuration..."
 	docker kill --signal="HUP" adapter
 	echo "Finished."
