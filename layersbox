@@ -433,13 +433,13 @@ def box_install(args):
     with open(join(servicedir, service_name, "nginx.conf")) as infile, open(join(servicedir, service_name, "nginx." + service_name + ".conf"), 'w') as outfile:
         for line in infile:
             if separator_http in line:
-                for line in infile: 
-                    print("Read the following line:{}".format(line)) 
-                    entry_name=line.split()[1].strip().
+            #    for line in infile: 
+            #        print("Read the following line:{}".format(line)) 
+                    entry_name=re.search(r'\//(.*)\:', line.split()[1]).group(0)[2:-1]
                     entries_list.extend(entry_name)
                     print("The following location will be added to the Adapter: {}".format(entry_name))
-                    replacements = {'http://' + entry_name :'http://' + container_ip}
                     for entry_name in entries_list:
+                        replacements = {'http://' + entry_name :'http://' + container_ip}
                         for src, target in replacements.iteritems():
                             line = line.replace(src, target)
                         outfile.write(line)
