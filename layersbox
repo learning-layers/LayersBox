@@ -424,15 +424,23 @@ def box_install(args):
     #   (linking only those container names that appear there)
     container_ip = subprocess.check_output(["docker", "inspect",
         "-f", "'{{ .NetworkSettings.IPAddress }}'", service_name]).replace("'", "").strip()
-
+    
+    entries_list=[]
+    separator="location"
+    with open(join(servicedir, service_name, "nginx.conf")) as conffile:
+        for line in conffile:
+        entry_name=line.split(separator, 1)[0].strip()
+        entries_list.extend(entry_name)
+        print("The following locations will be added to the Adapter: " + entry_name)
     # write IP into nginx.conf
     # taken from http://stackoverflow.com/questions/13089234/replacing-text-in-a-file-with-python
-        replacements = {'http://' + service_name :'http://' + container_ip}
+    replacements = {'http://' + entry_name :'http://' + container_ip}
     with open(join(servicedir, service_name, "nginx.conf")) as infile, open(join(servicedir, service_name, "nginx." + service_name + ".conf"), 'w') as outfile:
         for line in infile:
-            for src, target in replacements.iteritems():
-                line = line.replace(src, target)
-            outfile.write(line)
+            for entry_name in entries_list.iteritems():
+                for src, target in replacements.iteritems():
+                    line = line.replace(src, target)
+                outfile.write(line)
 
     # copy nginx.conf into container
     subprocess.check_output(["./add_nginx_conf.sh", service_name])
