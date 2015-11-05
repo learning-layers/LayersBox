@@ -437,7 +437,7 @@ def box_install(args):
 
     # copy nginx.conf into container
     #TODO: parameterize the shell script or run it directly from python
-    subprocess.check_output(["./add_nginx_conf.sh"])
+    subprocess.check_output(["./add_nginx_conf.sh", service_name])
 
     #TODO: send signal HUP to adapter container, either leave it in the add_nginx_conf.sh or do it here
 
@@ -557,7 +557,7 @@ def parse_args():
         dest='command')
 
 #    debug_parser = subparsers.add_parser('debug', help='Generates detailed information for debugging')
-#    debug_parser.add_argument('--debug', action='store_true', default='False')
+    #    debug_parser.add_argument('--debug', action='store_true', default='False')
 
 
     start_parser = subparsers.add_parser('start', help='Starts the LayersBox')
