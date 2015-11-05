@@ -436,10 +436,8 @@ def box_install(args):
             outfile.write(line)
 
     # copy nginx.conf into container
-    #TODO: parameterize the shell script or run it directly from python
     subprocess.check_output(["./add_nginx_conf.sh", service_name])
 
-    #TODO: send signal HUP to adapter container, either leave it in the add_nginx_conf.sh or do it here
 
     return 0
 
