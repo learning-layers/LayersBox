@@ -422,9 +422,12 @@ def box_install(args):
 
     # get internal IP of new container
     #   (linking only those container names that appear there)
+    #TODO: AFTER SOLVING A TODO ONLY REMOVE THE "TODO:" FROM THE LINE!!!
+    #TODO: find out the containers to link, e.g. by reading out nginx.conf
+    #TODO: currently, this only gets the IP if there is a container that by coincidence has the same name as the installer
     container_ip = subprocess.check_output(["docker", "inspect",
         "-f", "'{{ .NetworkSettings.IPAddress }}'", service_name]).replace("'", "").strip()
-    
+
     entries_list=[]
     #separator_location="location"
     separator_http="http"
@@ -433,8 +436,8 @@ def box_install(args):
     with open(join(servicedir, service_name, "nginx.conf")) as infile, open(join(servicedir, service_name, "nginx." + service_name + ".conf"), 'w') as outfile:
         for line in infile:
             if separator_http in line:
-            #    for line in infile: 
-            #        print("Read the following line:{}".format(line)) 
+            #    for line in infile:
+            #        print("Read the following line:{}".format(line))
                     entry_name=re.search(r'\//(.*)\:', line.split()[1]).group(0)[2:-1]
                     entries_list.extend(entry_name)
                     print("The following location will be added to the Adapter: {}".format(entry_name))
@@ -445,8 +448,10 @@ def box_install(args):
                         outfile.write(line)
 
     # copy nginx.conf into container
+    #TODO: run the script directly from python
     subprocess.check_output(["./add_nginx_conf.sh", service_name])
 
+    #TODO: send signal HUP to adapter container (currently done from shell)
 
     return 0
 
