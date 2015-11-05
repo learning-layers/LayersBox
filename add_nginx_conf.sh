@@ -1,8 +1,14 @@
 #!/bin/bash
 # This script serves to make a LayersBox Adapter aware of a new backend service.
 
-sn=@2
-echo "The new service is called $sn ."
+if [$# < 2]
+ then
+	sn=@2
+	echo "The new service is called $sn ."
+ else
+	echo "Too many service names specified! Aborting..."
+	exit 1
+fi
 
 td=/usr/local/openresty/conf/services
 echo "The path for all service subdirectories is set to $td ."
