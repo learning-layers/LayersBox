@@ -57,7 +57,7 @@ mysql:
     # volumes:
     #     - ./mysql/:/var/lib/mysql/
     ports:
-        - "127.0.0.1:3307:3306"
+        - "3306:3306"
 mysqlcreate:
     image: learninglayers/mysql-create:0.0.1
     links:
@@ -426,20 +426,23 @@ def box_install(args):
         "-f", "'{{ .NetworkSettings.IPAddress }}'", service_name]).replace("'", "").strip()
     
     entries_list=[]
-    separator="location"
+    #separator_location="location"
+    separator_http="http"
     # write IP into nginx.conf
     # taken from http://stackoverflow.com/questions/13089234/replacing-text-in-a-file-with-python
     with open(join(servicedir, service_name, "nginx.conf")) as infile, open(join(servicedir, service_name, "nginx." + service_name + ".conf"), 'w') as outfile:
         for line in infile:
-            entry_name=line.split(separator, 1)[0].strip()
-            entries_list.extend(entry_name)
-            print("The following location will be added to the Adapter: " + entry_name)
-            replacements = {'http://' + entry_name :'http://' + container_ip}
-
-        for entry_name in entries_list:
-            for src, target in replacements.iteritems():
-                line = line.replace(src, target)
-            outfile.write(line)
+            if separator_http in line:
+                for line in infile: 
+                    print("Read the following line:{}".format(line)) 
+                    entry_name=line.split()[1].strip().
+                    entries_list.extend(entry_name)
+                    print("The following location will be added to the Adapter: {}".format(entry_name))
+                    replacements = {'http://' + entry_name :'http://' + container_ip}
+                    for entry_name in entries_list:
+                        for src, target in replacements.iteritems():
+                            line = line.replace(src, target)
+                        outfile.write(line)
 
     # copy nginx.conf into container
     subprocess.check_output(["./add_nginx_conf.sh", service_name])
