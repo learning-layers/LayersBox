@@ -12,7 +12,7 @@ import six
 import copy
 from zipfile import ZipFile
 import tarfile
-import logging as log 
+
 join = os.path.join
 
 programs = ["docker", "docker-compose"]
@@ -421,7 +421,7 @@ def box_install(args):
     box_start(args)
 
     # get internal IP of new container
-    #TODO: find out somehow which containers to link, e.g. by reading out nginx.conf
+	    #TODO: find out somehow which containers to link, e.g. by reading out nginx.conf
     #   (linking only those container names that appear there)
     container_ip = subprocess.check_output(["docker", "inspect",
         "-f", "'{{ .NetworkSettings.IPAddress }}'", service_name]).replace("'", "").strip()
@@ -556,14 +556,9 @@ def parse_args():
         parameters)',
         dest='command')
 
-    ## for debugging purposes
-    #args = parser.parse_args()
-    #if parser.verbose:
-    #    log.basicConfig(format="%(levelname)s: %(message)s", level=log.DEBUG)
-    #    log.info("Verbose output.")
-    #else:
-    #    log.basicConfig(format="%(levelname)s: %(message)s")
-    ##log.info("Example message when -v specified at command line.")
+#    debug_parser = subparsers.add_parser('debug', help='Generates detailed information for debugging')
+#    debug_parser.add_argument('--debug', action='store_true', default='False')
+
 
     start_parser = subparsers.add_parser('start', help='Starts the LayersBox')
     start_parser.add_argument('--directory', '-d', action='store',
