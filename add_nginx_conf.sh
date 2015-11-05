@@ -37,14 +37,14 @@ if [ $out -gt 0 ]
 
 	docker exec adapter mkdir -p $nsv/
 
-	sf="nginx.${sn}conf"
-	if [ -f $sf ] 
+	sf="nginx.${sn}.conf"
+	if [ -f ./services/$sn/$sf ] 
 	 then 
 		echo "Service's nginx.conf found."
 		echo "Copying service's nginx.conf to newly created path $nsv..."
 		docker cp ./services/documentation/${sf} adapter-data:$nsv
 	 else
-		echo "No configuration file found! Current directory should contain it and the file must be named 'nginx.conf'. Aborting..."
+		echo "No configuration file found! The file must be named 'nginx.conf'. Aborting..."
 		exit 1
 	fi
 
