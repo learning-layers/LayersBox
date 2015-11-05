@@ -420,38 +420,32 @@ def box_install(args):
     # start box with updated docker-compose.yml
     box_start(args)
 
-    # get internal IP of new container
-    #   (linking only those container names that appear there)
-    #TODO: AFTER SOLVING A TODO ONLY REMOVE THE "TODO:" FROM THE LINE!!!
-    #TODO: find out the containers to link, e.g. by reading out nginx.conf
-    #TODO: currently, this only gets the IP if there is a container that by coincidence has the same name as the installer
-    container_ip = subprocess.check_output(["docker", "inspect",
-        "-f", "'{{ .NetworkSettings.IPAddress }}'", service_name]).replace("'", "").strip()
+    #TODO: AFTER SOLVING A TODO ONLY REMOVE THE "TODO:" NOT THE WHOLE LINE!!!
 
-    entries_list=[]
-    #separator_location="location"
-    separator_http="http"
-    # write IP into nginx.conf
-    # taken from http://stackoverflow.com/questions/13089234/replacing-text-in-a-file-with-python
-    with open(join(servicedir, service_name, "nginx.conf")) as infile, open(join(servicedir, service_name, "nginx." + service_name + ".conf"), 'w') as outfile:
+    proxied_servers = []
+    proxied_ips = {}
+
+    # parse nginx.conf to get a list of all proxied containers
+    #TODO: make sure to only read URLs after a "proxy_pass"
+    with open(join(servicedir, service_name, "nginx.conf")) as f:
+        proxied_servers = [w.replace('http://', '') for w in re.findall('(https?:\/\/[A-Za-z0-9]+)',f.read())]
+
+    # now get the IPs for the proxied containers
+    for proxy in proxied_servers:
+        container_ip = subprocess.check_output(["docker", "inspect",
+            "-f", "'{{ .NetworkSettings.IPAddress }}'", proxy]).replace("'", "").strip()
+        proxied_ips[proxy] = container_ip
+
+    # finally, replace the values
+    with open(join(servicedir, service_name, "nginx.conf")) as infile, open(join(servicedir, service_name, "nginx.adapted.conf"), 'w') as outfile:
         for line in infile:
-            if separator_http in line:
-            #    for line in infile:
-            #        print("Read the following line:{}".format(line))
-                    entry_name=re.search(r'\//(.*)\:', line.split()[1]).group(0)[2:-1]
-                    entries_list.extend(entry_name)
-                    print("The following location will be added to the Adapter: {}".format(entry_name))
-                    for entry_name in entries_list:
-                        replacements = {'http://' + entry_name :'http://' + container_ip}
-                        for src, target in replacements.iteritems():
-                            line = line.replace(src, target)
-                        outfile.write(line)
+            for src, target in proxied_ips.iteritems():
+                line = line.replace("http://" + src, "http://" + target)
+            outfile.write(line)
 
-    # copy nginx.conf into container
-    #TODO: run the script directly from python
+    # copy nginx.adapted.conf into container
+    #TODO: run the script directly from python, including sending HUP signal to adapter
     subprocess.check_output(["./add_nginx_conf.sh", service_name])
-
-    #TODO: send signal HUP to adapter container (currently done from shell)
 
     return 0
 
@@ -464,10 +458,13 @@ def box_start(args):
         if not check_tls(dir, url):
             return 1
     except:
-        print("This directory does not seem to contain a LayersBox")
+        print("This directory does not seem to contain a Layers Box configuration.")
         return 1
     subprocess.check_output(["docker-compose", "up", "-d"])
-    print("You can reach LayersBox now at https://{}/".format(url))
+
+    #TODO: regenerate nginx.adapted.conf files for all proxied services
+
+    print("You can now reach your Layers Box at https://{}/".format(url))
     return 0
 
 
@@ -476,7 +473,7 @@ def box_stop(args):
     try:
         read_url(args.directory)
     except:
-        print("This directory does not seem to contain a LayersBox")
+        print("This directory does not seem to contain a Layers Box configuration.")
         return 1
     subprocess.check_output(["docker-compose", "stop"])
     return 0

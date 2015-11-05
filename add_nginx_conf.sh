@@ -8,7 +8,7 @@ if [ $# -le 1 ]
 	 elif [ $# -eq 0 ]
           then
 		echo "No arguments passed to setup script. Aborting..."
-		exit 1 
+		exit 1
  else
 	echo "Too many service names specified! Aborting..."
 	exit 1
@@ -22,29 +22,29 @@ out=$(docker ps -a | grep -c adapter-data)
 if [ $out -gt 0 ]
  then
 	echo "Adapter data container found. Checking whether the service has been added already..."
-	nsv=$td/documentation
-	osv=$(docker exec adapter ls $nsv)	
-	
+	nsv=$td/$sn
+	osv=$(docker exec adapter ls $nsv)
+
 	if [ -z $osv  ]
-	 then 
+	 then
 		echo "No previous configuration for this service found. Proceeding with setup..."
-		echo "Creating path for new dir..."	
+		echo "Creating path for new dir..."
 	 else
 		echo "Previous configuration detected. Deleting old configuration..."
 		docker exec adapter rm -rf $osv
-		echo "Recreating path for new dir..."	
+		echo "Recreating path for new dir..."
 	fi
 
 	docker exec adapter mkdir -p $nsv/
 
-	sf="nginx.${sn}.conf"
-	if [ -f ./services/$sn/$sf ] 
-	 then 
-		echo "Service's nginx.conf found."
-		echo "Copying service's nginx.conf to newly created path $nsv..."
-		docker cp ./services/documentation/${sf} adapter-data:$nsv
+	sf="nginx.adapted.conf"
+	if [ -f ./services/$sn/$sf ]
+	 then
+		echo "Service's nginx.adapted.conf found."
+		echo "Copying service's nginx.adapted.conf to newly created path $nsv..."
+		docker cp ./services/$sn/${sf} adapter-data:$nsv
 	 else
-		echo "No configuration file found! The file must be named 'nginx.conf'. Aborting..."
+		echo "No configuration file found! The file must be named 'nginx.adapted.conf'. Aborting..."
 		exit 1
 	fi
 
