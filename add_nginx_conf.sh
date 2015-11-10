@@ -48,7 +48,5 @@ if [ $out -gt 0 ]
 		exit 1
 	fi
 
-	echo "Loading newly copied configuration..."
-	docker kill --signal="HUP" adapter
 	echo "Finished."
 fi

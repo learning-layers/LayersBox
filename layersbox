@@ -418,10 +418,11 @@ def box_install(args):
     generate_yml(dir)
 
     # start box with updated docker-compose.yml
-    box_start(args)
+    subprocess.check_output(["docker-compose", "up", "-d"])
 
-    #TODO: AFTER SOLVING A TODO ONLY REMOVE THE "TODO:" NOT THE WHOLE LINE!!!
+    # now, update the adapter to get the internal IP of the newly added service
 
+    """
     proxied_servers = []
     proxied_ips = {}
 
@@ -446,6 +447,62 @@ def box_install(args):
     # copy nginx.adapted.conf into container
     #TODO: run the script directly from python, including sending HUP signal to adapter
     subprocess.check_output(["./add_nginx_conf.sh", service_name])
+    """
+
+    update_adapter(config, servicedir, service_name);
+
+    return 0
+
+def update_adapter(config, service_directory, service_name):
+    """Informs the adapter of a new service or updates new service configuration in the adapter.
+
+    :config: parsed box.yml
+    :service_directory: the directory where the services are saved
+    :service_name: the name of the newly added service, or None for updating all services
+    :returns: shell return code
+    """
+
+    # a list of all service names to update
+    servicesToUpdate = []
+
+    if service_name is None:
+        # update IPs of all services
+        services = config['services']
+        for service_name, service in services.iteritems():
+            servicesToUpdate.append(service_name)
+    else:
+        # parse nginx.conf of the service to get a list of all its proxied containers
+        servicesToUpdate.append(service_name)
+
+    proxied_servers = []
+    proxied_ips = {}
+
+    for service_name in servicesToUpdate:
+        # parse nginx.conf of all services to get a list of all proxied containers
+        #TODO: make sure to only read URLs after a "proxy_pass"
+        with open(join(service_directory, service_name, "nginx.conf")) as f:
+            proxied_servers = [w.replace('http://', '') for w in re.findall('(https?:\/\/[A-Za-z0-9]+)',f.read())]
+
+    # now get the IPs of the proxied containers
+    for proxy in proxied_servers:
+        container_ip = subprocess.check_output(["docker", "inspect",
+            "-f", "'{{ .NetworkSettings.IPAddress }}'", proxy]).replace("'", "").strip()
+        proxied_ips[proxy] = container_ip
+
+    # finally, replace the values
+    for service_name in servicesToUpdate:
+        with open(join(service_directory, service_name, "nginx.conf")) as infile, open(join(service_directory, service_name, "nginx.adapted.conf"), 'w') as outfile:
+            for line in infile:
+                for src, target in proxied_ips.iteritems():
+                    line = line.replace("http://" + src, "http://" + target)
+                outfile.write(line)
+
+        # copy nginx.adapted.conf into container
+        #TODO: run the whole script directly from python
+        subprocess.check_output(["./add_nginx_conf.sh", service_name])
+
+    # send the adapter the HUP kill signal
+    subprocess.check_output(["docker", "kill", '--signal="HUP"', "adapter"])
 
     return 0
 
@@ -462,7 +519,10 @@ def box_start(args):
         return 1
     subprocess.check_output(["docker-compose", "up", "-d"])
 
-    #TODO: regenerate nginx.adapted.conf files for all proxied services
+    # regenerate nginx.adapted.conf files for all proxied services
+    config = read_config(dir)
+    servicedir = join(dir, "services")
+    update_adapter(config, servicedir, None);
 
     print("You can now reach your Layers Box at https://{}/".format(url))
     return 0
