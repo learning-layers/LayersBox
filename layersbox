@@ -228,29 +228,23 @@ def merge_ymls(base, addon, databases=[]):
     # top level containers, that is names like "mysql" and "mysql-data".
     # "name" is the container name, "obj" contains the settings
     for name, obj in addon.copy().iteritems():
-        # if there is a key called "needs" then return its value, otherwise return empty list
-        needs = 'needs' in obj and obj.pop('needs') or []
+        # if there is a key called "actions" then return its value, otherwise return empty list
+        actions = 'actions' in obj and obj.pop('actions') or []
 
         # merges each container of the new service's docker-compose.yml into the base.yml
         merged = data_merge(base, {name: obj})
 
-        # the following code makes basically sure, that databases are created and
-        # that the adapter is linking to all containers.
-        for need in needs:
-            # if it is a container name, do nothing
-            if type(need) == str:
-                # pass is required in python when a command is required syntactically
-                # but nothing needs to be done
-                pass
-            elif type(need) == dict:
-                for k, v in need.iteritems():
+        # the following code makes sure that databases are created
+        for action in actions:
+            if type(action) == dict:
+                for k, v in action.iteritems():
                     if k == "create_databases":
                         print("Added database {}".format(v))
                         databases.append(v)
                     else:
                         merged, databases = merge_ymls(merged, {k: v}, databases)
             else:
-                print("Need is {}".format(need))
+                print("Action is {}".format(action))
                 raise
     # print(merged)
 
@@ -417,38 +411,71 @@ def box_install(args):
 
     generate_yml(dir)
 
+    database_env_files = []
+    databases = {}
+    # read out service's docker-compose.yml file, find create_databases there
+    # since databases only need to be created at install time.
+    with open(addon_yml, 'r') as f:
+        addon = yaml.load(f.read())
+
+    for name, obj in addon.copy().iteritems():
+        # if there is a key called "actions" then return its value, otherwise return empty list
+        actions = 'actions' in obj and obj.pop('actions') or []
+
+        # the following code makes sure that databases to be created are identified
+        for action in actions:
+            if type(action) == dict:
+                for k, v in action.iteritems():
+                    if k == "create_databases":
+                        database_env_files.append(v)
+
+    # now we have a list of environment files to check for database names
+    for env_file in database_env_files:
+        # we support one database per env file currently
+        db_key = ""
+        db_name = ""
+        db_username = ""
+        db_file = ""
+        db_exists = False
+        with open(join(servicedir, service_name, env_file)) as infile:
+            for line in infile:
+                if "_MYSQL_NAME" in line:
+                    db_key = line.split("_MYSQL_NAME=")[0]
+                    db_name = line.split("=")[1]
+                elif "_MYSQL_USERNAME" in line:
+                    db_username = line.split("=")[1]
+                elif "_MYSQL_FILE" in line:
+                    db_file = line.split("=")[1].replace('\n', '')
+                    db_exists = True
+                    shutil.copyfile(join(servicedir, service_name, db_file), join(dir, "tmp", "sqlfile", "db.sql"))
+
+        # save name and username to secret.env that mysql-create is using
+        with open(join(dir, "tmp", "secret.env"), 'w') as f:
+            #f.writelines(["SERVICE_DB_NAME=%s" % db_name, "SERVICE_DB_USER=%s" % db_username])
+            f.write('SERVICE_DB_NAME={}SERVICE_DB_USER={}'.format(db_name,db_username))
+            if not db_exists:
+                f.write("SERVICE_DB_EXISTS=True")
+
+        # generate database and parse output
+        mysqlcreate_output = subprocess.check_output(["docker-compose", "run", "mysqlcreate"])
+        db_password = mysqlcreate_output.split(" -p")[1].split(" -hmysql")[0]
+        # write password to env file
+        with open(join(servicedir, service_name, env_file), "a") as outfile:
+            outfile.write("{}_MYSQL_PASSWORD={}".format(db_key, db_password))
+
+        # clean up and delete secret.env content, otherwise db is created again
+        with open(join(dir, "tmp", "secret.env"), "w"):
+            pass
+        # clean up and delete sqlfile
+        try:
+            os.remove(join(dir, "tmp", "sqlfile", "db.sql"))
+        except OSError:
+            pass
+
     # start box with updated docker-compose.yml
     subprocess.check_output(["docker-compose", "up", "-d"])
 
     # now, update the adapter to get the internal IP of the newly added service
-
-    """
-    proxied_servers = []
-    proxied_ips = {}
-
-    # parse nginx.conf to get a list of all proxied containers
-    #TODO: make sure to only read URLs after a "proxy_pass"
-    with open(join(servicedir, service_name, "nginx.conf")) as f:
-        proxied_servers = [w.replace('http://', '') for w in re.findall('(https?:\/\/[A-Za-z0-9]+)',f.read())]
-
-    # now get the IPs for the proxied containers
-    for proxy in proxied_servers:
-        container_ip = subprocess.check_output(["docker", "inspect",
-            "-f", "'{{ .NetworkSettings.IPAddress }}'", proxy]).replace("'", "").strip()
-        proxied_ips[proxy] = container_ip
-
-    # finally, replace the values
-    with open(join(servicedir, service_name, "nginx.conf")) as infile, open(join(servicedir, service_name, "nginx.adapted.conf"), 'w') as outfile:
-        for line in infile:
-            for src, target in proxied_ips.iteritems():
-                line = line.replace("http://" + src, "http://" + target)
-            outfile.write(line)
-
-    # copy nginx.adapted.conf into container
-    #TODO: run the script directly from python, including sending HUP signal to adapter
-    subprocess.check_output(["./add_nginx_conf.sh", service_name])
-    """
-
     update_adapter(config, servicedir, service_name);
 
     return 0
@@ -613,6 +640,10 @@ def box_init(args):
     # Workaround for logs dir not being available in the adapterdata container
     os.makedirs(join(dir, 'logs/'))
 
+    return 0
+
+
+def create_databases():
     return 0
 
 
