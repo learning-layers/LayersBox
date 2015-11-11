@@ -496,10 +496,12 @@ def update_adapter(config, service_directory, service_name):
         # update IPs of all services
         services = config['services']
         for service_name, service in services.iteritems():
-            servicesToUpdate.append(service_name)
+            if os.path.isfile(join(service_directory, service_name, "nginx.conf")):
+                servicesToUpdate.append(service_name)
     else:
         # parse nginx.conf of the service to get a list of all its proxied containers
-        servicesToUpdate.append(service_name)
+        if os.path.isfile(join(service_directory, service_name, "nginx.conf")):
+            servicesToUpdate.append(service_name)
 
     proxied_servers = []
     proxied_ips = {}
