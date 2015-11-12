@@ -328,6 +328,17 @@ def generate_yml(dir):
         # open docker-compose.yml file for each service
         with open(join(dir, service_yml), 'r') as addon_file:
             addon = yaml.load(addon_file.read())
+            # fix env_files definitions in addon to refer to path where service's files were copied
+            for subservice_values in addon.values():
+                if 'env_file' in subservice_values:
+                    new_envs = []
+                    for env in subservice_values['env_file']:
+                        # common.env shouldn't redirect to services' definition, it is *common*
+                        if env == 'common.env' or env.startswith('services'):
+                            new_envs.append(env)
+                        else:
+                            new_envs.append('services/%s/%s' % (service_name, env))
+                    subservice_values['env_file'] = new_envs 
             # merged is the base one
             merged, more_databases = merge_ymls(merged, addon)
             # "extend" extends list by appending elements from the iterable
@@ -387,7 +398,11 @@ def box_install(args):
             os.makedirs(tmp_servicedir)
         if not os.path.exists(servicedir):
             os.makedirs(servicedir)
-        response = urllib2.urlopen(url)
+        try:
+            response = urllib2.urlopen(url)
+        except urllib2.HTTPError:
+            print "Failed to download service package from %s" % url
+            return 1
         with open(release_tar, 'w') as f:
             f.write(response.read())
         with tarfile.open(release_tar) as t:
@@ -629,8 +644,10 @@ def box_init(args):
     with open(page_zip, 'w') as f:
         f.write(response.read())
     with ZipFile(page_zip, 'r') as zip:
-        os.makedirs(join(dir, 'html/'))
-        zip.extractall(join(dir, 'html/'))
+        html_dir = join(dir, 'html/')
+        if not os.path.exists(html_dir):
+            os.makedirs(html_dir)
+        zip.extractall(html_dir)
     os.remove(page_zip)
 
     config = {'services': {}}
@@ -640,8 +657,9 @@ def box_init(args):
     print("Make sure port 80 and 443 are not in use on this machine")
     print("You can start your LayersBox with 'layersbox start'")
     # Workaround for logs dir not being available in the adapterdata container
-    os.makedirs(join(dir, 'logs/'))
-
+    log_dir = join(dir, 'logs/')
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
     return 0
 
 
