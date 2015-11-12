@@ -454,12 +454,12 @@ def box_install(args):
         db_exists = False
         with open(join(servicedir, service_name, env_file)) as infile:
             for line in infile:
-                if "_MYSQL_NAME" in line:
-                    db_key = line.split("_MYSQL_NAME=")[0]
+                if "_DB_NAME" in line:
+                    db_key = line.split("_DB_NAME=")[0]
                     db_name = line.split("=")[1]
-                elif "_MYSQL_USERNAME" in line:
+                elif "_DB_USER" in line:
                     db_username = line.split("=")[1]
-                elif "_MYSQL_FILE" in line:
+                elif "_DB_FILE" in line:
                     db_file = line.split("=")[1].replace('\n', '')
                     db_exists = True
                     shutil.copyfile(join(servicedir, service_name, db_file), join(dir, "tmp", "sqlfile", "db.sql"))
@@ -476,7 +476,7 @@ def box_install(args):
         db_password = mysqlcreate_output.split(" -p")[1].split(" -hmysql")[0]
         # write password to env file
         with open(join(servicedir, service_name, env_file), "a") as outfile:
-            outfile.write("{}_MYSQL_PASSWORD={}".format(db_key, db_password))
+            outfile.write("{}_DB_PASS={}".format(db_key, db_password))
 
         # clean up and delete secret.env content, otherwise db is created again
         with open(join(dir, "tmp", "secret.env"), "w"):
