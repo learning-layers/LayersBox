@@ -523,7 +523,7 @@ def box_uninstall(args):
         image = 'image' in obj and obj.pop('image') or None
         images.append(image)
 
-    #TODO: remove nginx.adapted.conf
+    #TODO: remove nginx.adapted.conf from adapter and send HUP signal
 
     for image in images:
         # get the container numbers
@@ -542,13 +542,16 @@ def box_uninstall(args):
         # remove images
         subprocess.check_output(["docker", "rmi", "{}".format(image)])
 
-    #TODO: delete from box.yml
+    # delete from box.yml
     config = read_config(dir)
     services = config.get('services')
     if repo in services.keys():
         del services[repo]
         config['services'] = services
         write_config(dir, config)
+
+    # regenerate main docker-compose.yml
+    generate_yml()
 
     #TODO: delete service subfolder in services
 
