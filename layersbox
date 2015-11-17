@@ -7,6 +7,7 @@ import argparse
 import shutil
 import re
 import yaml
+import json
 import urllib2
 import six
 import copy
@@ -220,7 +221,7 @@ def generate_cert(dir, domain):
     return True
 
 
-def merge_ymls(base, addon, databases=[]):
+def merge_ymls(base, addon, databases=[], oidcclients=[]):
     """Merges two yml files into one
 
     :base: base yml data
@@ -244,14 +245,17 @@ def merge_ymls(base, addon, databases=[]):
                     if k == "create_databases":
                         print("Added database {}".format(v))
                         databases.append(v)
+                    elif k == "create_oidcclient":
+                        print("Added OIDC client {}".format(v))
+                        oidcclients.append(v)
                     else:
-                        merged, databases = merge_ymls(merged, {k: v}, databases)
+                        merged, databases, oidcclients = merge_ymls(merged, {k: v}, databases, oidcclients)
             else:
                 print("Action is {}".format(action))
                 raise
     # print(merged)
 
-    return merged, databases
+    return merged, databases, oidcclients
 
 
 class YamlReaderError(Exception):
@@ -323,6 +327,7 @@ def generate_yml(dir):
     config = read_config(dir)
     services = config['services']
     databases = []
+    oidcclients = []
     # for with service_name e.g. being "documentation" and service the value of the
     # service called "documentation"
     for service_name, service in services.iteritems():
@@ -343,9 +348,10 @@ def generate_yml(dir):
                             new_envs.append('services/%s/%s' % (service_name, env))
                     subservice_values['env_file'] = new_envs
             # merged is the base one
-            merged, more_databases = merge_ymls(merged, addon)
+            merged, more_databases, more_oidcclients = merge_ymls(merged, addon)
             # "extend" extends list by appending elements from the iterable
             databases.extend(more_databases)
+            oidcclients.extend(more_oidcclients)
 
     # print(yaml.dump(merged))
     with open(join(dir, "docker-compose.yml"), 'w') as f:
@@ -430,7 +436,7 @@ def box_install(args):
     generate_yml(dir)
 
     database_env_files = []
-    databases = {}
+    oidcclient_env_files = []
     # read out service's docker-compose.yml file, find create_databases there
     # since databases only need to be created at install time.
     with open(addon_yml, 'r') as f:
@@ -446,49 +452,14 @@ def box_install(args):
                 for k, v in action.iteritems():
                     if k == "create_databases":
                         database_env_files.append(v)
+                    elif k == "create_oidcclients":
+                        oidcclient_env_files.append(v)
 
-    # now we have a list of environment files to check for database names
-    for env_file in database_env_files:
-        # we support one database per env file currently
-        db_key = ""
-        db_name = ""
-        db_username = ""
-        db_file = ""
-        db_exists = False
-        with open(join(servicedir, service_name, env_file)) as infile:
-            for line in infile:
-                if "_DB_NAME" in line:
-                    db_key = line.split("_DB_NAME=")[0]
-                    db_name = line.split("=")[1]
-                elif "_DB_USER" in line:
-                    db_username = line.split("=")[1]
-                elif "_DB_FILE" in line:
-                    db_file = line.split("=")[1].replace('\n', '')
-                    db_exists = True
-                    shutil.copyfile(join(servicedir, service_name, db_file), join(dir, "tmp", "sqlfile", "db.sql"))
+    # create databases with the list of environment files to check for database names
+    create_databases(dir, service_name, database_env_files)
 
-        # save name and username to secret.env that mysql-create is using
-        with open(join(dir, "tmp", "secret.env"), 'w') as f:
-            #f.writelines(["SERVICE_DB_NAME=%s" % db_name, "SERVICE_DB_USER=%s" % db_username])
-            f.write('SERVICE_DB_NAME={}SERVICE_DB_USER={}'.format(db_name,db_username))
-            if not db_exists:
-                f.write("SERVICE_DB_EXISTS=True")
-
-        # generate database and parse output
-        mysqlcreate_output = subprocess.check_output(["docker-compose", "run", "mysqlcreate"])
-        db_password = mysqlcreate_output.split(" -p")[1].split(" -hmysql")[0]
-        # write password to env file
-        with open(join(servicedir, service_name, env_file), "a") as outfile:
-            outfile.write("{}_DB_PASS={}".format(db_key, db_password))
-
-        # clean up and delete secret.env content, otherwise db is created again
-        with open(join(dir, "tmp", "secret.env"), "w"):
-            pass
-        # clean up and delete sqlfile
-        try:
-            os.remove(join(dir, "tmp", "sqlfile", "db.sql"))
-        except OSError:
-            pass
+    # create oidcclients with the list of environment files to check for oidc settings
+    create_oidcclients(dir, service_name, oidcclient_env_files)
 
     # start box with updated docker-compose.yml
     subprocess.check_output(["docker-compose", "up", "-d"])
@@ -729,7 +700,85 @@ def box_init(args):
     return 0
 
 
-def create_databases():
+def create_databases(dir, service_name, database_env_files):
+    servicedir = join(dir, "services")
+
+
+    for env_file in database_env_files:
+        # we support one database per env file currently
+        db_key = ""
+        db_name = ""
+        db_username = ""
+        db_file = ""
+        db_exists = False
+        with open(join(servicedir, service_name, env_file)) as infile:
+            for line in infile:
+                if "_DB_NAME" in line:
+                    db_key = line.split("_DB_NAME=")[0]
+                    db_name = line.split("=")[1]
+                elif "_DB_USER" in line:
+                    db_username = line.split("=")[1]
+                elif "_DB_FILE" in line:
+                    db_file = line.split("=")[1].replace('\n', '')
+                    db_exists = True
+                    shutil.copyfile(join(servicedir, service_name, db_file), join(dir, "tmp", "sqlfile", "db.sql"))
+
+        # save name and username to secret.env that mysql-create is using
+        with open(join(dir, "tmp", "secret.env"), 'w') as f:
+            #f.writelines(["SERVICE_DB_NAME=%s" % db_name, "SERVICE_DB_USER=%s" % db_username])
+            f.write('SERVICE_DB_NAME={}SERVICE_DB_USER={}'.format(db_name,db_username))
+            if not db_exists:
+                f.write("SERVICE_DB_EXISTS=True")
+
+        # generate database and parse output
+        mysqlcreate_output = subprocess.check_output(["docker-compose", "run", "mysqlcreate"])
+        db_password = mysqlcreate_output.split(" -p")[1].split(" -hmysql")[0]
+        # write password to env file
+        with open(join(servicedir, service_name, env_file), "a") as outfile:
+            outfile.write("{}_DB_PASS={}".format(db_key, db_password))
+
+        # clean up and delete secret.env content, otherwise db is created again
+        with open(join(dir, "tmp", "secret.env"), "w"):
+            pass
+        # clean up and delete sqlfile
+        try:
+            os.remove(join(dir, "tmp", "sqlfile", "db.sql"))
+        except OSError:
+            pass
+    return 0
+
+
+def create_oidcclients(dir, service_name, oidcclient_env_files):
+    layers_api_uri = None
+    with open(join(dir, 'common.env')) as common_file:
+        for line in common_file:
+            if "LAYERS_API_URI" in line:
+                layers_api_uri = line.split("=")[1].replace('\n', '')
+
+    for env_file in oidcclient_env_files:
+        # we support one OIDC client per env file currently
+        oidc_key = None
+        oidc_json = None
+        with open(join(servicedir, service_name, env_file)) as infile:
+            for line in infile:
+                if "_OIDC_FILE" in line:
+                    oidc_key = line.split("_OIDC_FILE=")[0]
+                    oidc_json_file = line.split("=")[1].replace('\n', '')
+                    with open (join(servicedir, oidc_json_file), "r") as myfile:
+                        oidc_json = myfile.read().replace('\n', '')
+
+        # run HTTP POST against OIDC endpoint and then save the results into the env file
+        req = urllib2.Request(layers_api_uri + 'o/oauth2/register')
+        req.add_header('Content-Type', 'application/json')
+        response = urllib2.urlopen(req, oidc_json)
+        oidc_config = json.loads(response)
+
+        #print(oidc_config)
+
+        # save values to env file
+        with open(join(servicedir, service_name, env_file), "a") as outfile:
+            outfile.write("{}_OIDC_CLIENT_ID={}".format(oidc_key, oidc_config['client_id']))
+            outfile.write("{}_OIDC_CLIENT_SECRET={}".format(oidc_key, oidc_config['client_secret']))
     return 0
 
 
