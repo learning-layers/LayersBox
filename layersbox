@@ -41,6 +41,7 @@ adapter:
         - "80:80"
         - "443:443"
 mysqldata:
+    container_name: mysql-data
     image: learninglayers/mysql-data:0.0.1
     env_file:
         - common.env
@@ -48,6 +49,7 @@ mysqldata:
     volumes:
         - ./mysql-data/backup/:/backup
 mysql:
+    container_name: mysql
     image: learninglayers/mysql:0.0.1
     env_file:
         - common.env
@@ -59,6 +61,7 @@ mysql:
     ports:
         - "3306:3306"
 mysqlcreate:
+    container_name: mysql-create
     image: learninglayers/mysql-create:0.0.1
     links:
         - mysql
@@ -338,7 +341,7 @@ def generate_yml(dir):
                             new_envs.append(env)
                         else:
                             new_envs.append('services/%s/%s' % (service_name, env))
-                    subservice_values['env_file'] = new_envs 
+                    subservice_values['env_file'] = new_envs
             # merged is the base one
             merged, more_databases = merge_ymls(merged, addon)
             # "extend" extends list by appending elements from the iterable
@@ -495,6 +498,65 @@ def box_install(args):
 
     return 0
 
+
+def box_uninstall(args):
+    """Removes a service from a LayersBox
+
+    :args: parsed arguments
+    :returns: shell return code
+    """
+    # the following two lines come from the command line
+    dir = args.directory
+    repo = args.repository
+    #version = args.version
+    #tag = args.tag
+    if "#" in repo:
+        repo, version = repo.split("#")
+    organization, repo = repo.split("/")
+
+    images = []
+    # read out docker-compose.yml of service
+    compose_yaml = None
+    with open(join(dir, "services", repo, 'docker-compose.yml'), 'r') as f:
+        compose_yaml = yaml.load(f.read())
+    for container, obj in compose_yaml.iteritems():
+        image = 'image' in obj and obj.pop('image') or None
+        images.append(image)
+
+    #TODO: remove nginx.adapted.conf
+
+    for image in images:
+        # get the container numbers
+        container_numbers = subprocess.check_output(["docker", "ps", "-a" "-q", "--filter", "ancestor={}".format(image)])
+        if container_numbers == "":
+            break
+
+        # stop containers in docker-compose.yml
+        subprocess.check_output(["docker", "stop",
+                                 "{}".format(container_numbers).replace('\n', ' ').rstrip()])
+
+        # remove containers
+        subprocess.check_output(["docker", "rm",
+                                 "{}".format(container_numbers).replace('\n', ' ').rstrip()])
+
+        # remove images
+        subprocess.check_output(["docker", "rmi", "{}".format(image)])
+
+    #TODO: delete from box.yml
+    config = read_config(dir)
+    services = config.get('services')
+    if repo in services.keys():
+        del services[repo]
+        config['services'] = services
+        write_config(dir, config)
+
+    #TODO: delete service subfolder in services
+
+    print("Successfully removed service {}.".format(args.repository))
+
+    return 0
+
+
 def update_adapter(config, service_directory, service_name):
     """Informs the adapter of a new service or updates new service configuration in the adapter.
 
@@ -543,7 +605,7 @@ def update_adapter(config, service_directory, service_name):
 
         # copy nginx.adapted.conf into container
         #TODO: run the whole script directly from python
-        subprocess.check_output([join(layersbox_src,"add_nginx_conf.sh"), 
+        subprocess.check_output([join(layersbox_src,"add_nginx_conf.sh"),
 service_name])
 
     # send the adapter the HUP kill signal
@@ -733,6 +795,15 @@ def parse_args():
    # gr.add_argument("-t", "--tag")
 
     install_parser.set_defaults(func=box_install)
+
+    uninstall_parser = subparsers.add_parser(
+        'uninstall', help='Removes a component from the LayersBox')
+    uninstall_parser.add_argument(
+        'repository', action='store',
+        help='Github repository of the service. Example: "owner/repo#version"')
+    uninstall_parser.add_argument('--directory', '-d', action='store',
+                                help='Directory of the box', default='.')
+    uninstall_parser.set_defaults(func=box_uninstall)
 
     return parser.parse_args()
 
