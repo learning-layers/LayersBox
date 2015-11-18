@@ -522,7 +522,7 @@ def box_uninstall(args):
         write_config(dir, config)
 
     # regenerate main docker-compose.yml
-    generate_yml()
+    generate_yml(dir)
 
     #TODO: delete service subfolder in services
 
