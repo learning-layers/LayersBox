@@ -24,7 +24,7 @@ layersbox_src = os.path.dirname(os.path.realpath(__file__))
 
 minimal_data = '''adapterdata:
     container_name: adapter-data
-    image: learninglayers/adapter-data:0.0.2
+    image: learninglayers/adapter-data:0.0.3
     env_file:
         - common.env
 adapter:
