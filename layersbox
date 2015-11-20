@@ -9,6 +9,7 @@ import re
 import yaml
 import json
 import urllib2
+import ssl
 import six
 import copy
 from zipfile import ZipFile
@@ -245,7 +246,7 @@ def merge_ymls(base, addon, databases=[], oidcclients=[]):
                     if k == "create_databases":
                         print("Added database {}".format(v))
                         databases.append(v)
-                    elif k == "create_oidcclient":
+                    elif k == "create_oidcclients":
                         print("Added OIDC client {}".format(v))
                         oidcclients.append(v)
                     else:
@@ -706,7 +707,6 @@ def box_init(args):
 def create_databases(dir, service_name, database_env_files):
     servicedir = join(dir, "services")
 
-
     for env_file in database_env_files:
         # we support one database per env file currently
         db_key = ""
@@ -752,36 +752,43 @@ def create_databases(dir, service_name, database_env_files):
 
 
 def create_oidcclients(dir, service_name, oidcclient_env_files):
+    servicedir = join(dir, "services")
+
     layers_api_uri = None
     with open(join(dir, 'common.env')) as common_file:
         for line in common_file:
             if "LAYERS_API_URI" in line:
                 layers_api_uri = line.split("=")[1].replace('\n', '')
 
+    # evil workaround from http://stackoverflow.com/questions/19268548/python-ignore-certicate-validation-urllib2
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
     for env_file in oidcclient_env_files:
         # we support one OIDC client per env file currently
         oidc_key = None
         oidc_json = None
-        with open(join(servicedir, service_name, env_file)) as infile:
+        with open(join(servicedir, service_name, env_file[0])) as infile:
             for line in infile:
                 if "_OIDC_FILE" in line:
                     oidc_key = line.split("_OIDC_FILE=")[0]
                     oidc_json_file = line.split("=")[1].replace('\n', '')
-                    with open (join(servicedir, oidc_json_file), "r") as myfile:
+                    with open (join(servicedir, service_name, oidc_json_file), "r") as myfile:
                         oidc_json = myfile.read().replace('\n', '')
 
         # run HTTP POST against OIDC endpoint and then save the results into the env file
         req = urllib2.Request(layers_api_uri + 'o/oauth2/register')
         req.add_header('Content-Type', 'application/json')
-        response = urllib2.urlopen(req, oidc_json)
+        response = urllib2.urlopen(req, oidc_json, context=ctx).read()
         oidc_config = json.loads(response)
 
         #print(oidc_config)
 
         # save values to env file
-        with open(join(servicedir, service_name, env_file), "a") as outfile:
-            outfile.write("{}_OIDC_CLIENT_ID={}".format(oidc_key, oidc_config['client_id']))
-            outfile.write("{}_OIDC_CLIENT_SECRET={}".format(oidc_key, oidc_config['client_secret']))
+        with open(join(servicedir, service_name, env_file[0]), "a") as outfile:
+            outfile.write("{}_OIDC_CLIENT_ID={}\n".format(oidc_key, oidc_config['client_id']))
+            outfile.write("{}_OIDC_CLIENT_SECRET={}\n".format(oidc_key, oidc_config['client_secret']))
     return 0
 
 
