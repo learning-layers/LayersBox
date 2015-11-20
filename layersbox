@@ -540,6 +540,8 @@ def update_adapter(config, service_directory, service_name):
     :returns: shell return code
     """
 
+    print("Updating adapter...")
+
     # a list of all service names to update
     servicesToUpdate = []
 
@@ -561,7 +563,8 @@ def update_adapter(config, service_directory, service_name):
         # parse nginx.conf of all services to get a list of all proxied containers
         #TODO: make sure to only read URLs after a "proxy_pass"
         with open(join(service_directory, service_name, "nginx.conf")) as f:
-            proxied_servers = [w.replace('http://', '') for w in re.findall('(https?:\/\/[A-Za-z0-9]+)',f.read())]
+            for w in re.findall('(https?:\/\/[A-Za-z0-9]+)',f.read()):
+                proxied_servers.append(w.replace('http://', ''))
 
     # now get the IPs of the proxied containers
     for proxy in proxied_servers:
