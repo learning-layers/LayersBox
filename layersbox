@@ -738,7 +738,7 @@ def create_databases(dir, service_name, database_env_files):
         db_password = mysqlcreate_output.split(" -p")[1].split(" -hmysql")[0]
         # write password to env file
         with open(join(servicedir, service_name, env_file[0]), "a") as outfile:
-            outfile.write("{}_DB_PASS={}".format(db_key, db_password))
+            outfile.write("\n{}_DB_PASS={}".format(db_key, db_password))
 
         # clean up and delete secret.env content, otherwise db is created again
         with open(join(dir, "tmp", "secret.env"), "w"):
