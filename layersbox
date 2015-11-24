@@ -760,10 +760,16 @@ def create_oidcclients(dir, service_name, oidcclient_env_files):
             if "LAYERS_API_URI" in line:
                 layers_api_uri = line.split("=")[1].replace('\n', '')
 
+    # For Python >2.7.9, give context to override local unsigned https warnings
     # evil workaround from http://stackoverflow.com/questions/19268548/python-ignore-certicate-validation-urllib2
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
+    if hasattr(ssl, 'create_default_context'):
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    else:
+        # For older pythons the warnings do not stop the show and can be ignored 
+        # (anyways, they don't have the ssl.create_default_context.)
+        ctx = None
 
     for env_file in oidcclient_env_files:
         # we support one OIDC client per env file currently
@@ -782,7 +788,10 @@ def create_oidcclients(dir, service_name, oidcclient_env_files):
         # run HTTP POST against OIDC endpoint and then save the results into the env file
         req = urllib2.Request(layers_api_uri + 'o/oauth2/register')
         req.add_header('Content-Type', 'application/json')
-        response = urllib2.urlopen(req, oidc_json, context=ctx).read()
+        if ctx:
+            response = urllib2.urlopen(req, oidc_json, context=ctx).read()
+        else:
+            response = urllib2.urlopen(req, oidc_json).read()
         oidc_config = json.loads(response)
 
         #print(oidc_config)
