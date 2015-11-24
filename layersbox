@@ -714,7 +714,9 @@ def create_databases(dir, service_name, database_env_files):
         db_username = ""
         db_file = ""
         db_exists = False
-        with open(join(servicedir, service_name, env_file[0])) as infile:
+        if isinstance(env_file, (tuple, list)):
+            env_file = env_file[0]
+        with open(join(servicedir, service_name, env_file)) as infile:
             for line in infile:
                 if "_DB_NAME" in line:
                     db_key = line.split("_DB_NAME=")[0]
@@ -737,7 +739,7 @@ def create_databases(dir, service_name, database_env_files):
         mysqlcreate_output = subprocess.check_output(["docker-compose", "run", "mysqlcreate"])
         db_password = mysqlcreate_output.split(" -p")[1].split(" -hmysql")[0]
         # write password to env file
-        with open(join(servicedir, service_name, env_file[0]), "a") as outfile:
+        with open(join(servicedir, service_name, env_file), "a") as outfile:
             outfile.write("\n{}_DB_PASS={}".format(db_key, db_password))
 
         # clean up and delete secret.env content, otherwise db is created again
