@@ -109,7 +109,7 @@ def check_programs(programs):
     """
     for p in programs:
         if not which(p):
-            print("% is not installed! Exiting.".format(p))
+            print("%s is not installed! Exiting." % p)
             return False
     return True
 
@@ -776,6 +776,8 @@ def create_oidcclients(dir, service_name, oidcclient_env_files):
                     oidc_json_file = line.split("=")[1].replace('\n', '')
                     with open (join(servicedir, service_name, oidc_json_file), "r") as myfile:
                         oidc_json = myfile.read().replace('\n', '')
+                    oidc_json = oidc_json.replace('LAYERS_API_URI', layers_api_uri)
+                    oidc_json = oidc_json.replace('LAYERS_APP_URI', layers_api_uri)
 
         # run HTTP POST against OIDC endpoint and then save the results into the env file
         req = urllib2.Request(layers_api_uri + 'o/oauth2/register')
