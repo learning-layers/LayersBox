@@ -724,7 +724,7 @@ def create_databases(dir, service_name, database_env_files):
                 elif "_DB_USER" in line:
                     db_username = line.split("=")[1]
                 elif "_DB_FILE" in line:
-                    db_file = line.split("=")[1].replace('\n', '')
+                    db_file = line.split("=")[1].replace('\n', '').replace('\r', '')
                     db_exists = True
                     shutil.copyfile(join(servicedir, service_name, db_file), join(dir, "tmp", "sqlfile", "db.sql"))
 
@@ -769,7 +769,7 @@ def create_oidcclients(dir, service_name, oidcclient_env_files):
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
     else:
-        # For older pythons the warnings do not stop the show and can be ignored 
+        # For older pythons the warnings do not stop the show and can be ignored
         # (anyways, they don't have the ssl.create_default_context.)
         ctx = None
 
