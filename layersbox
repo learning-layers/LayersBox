@@ -583,8 +583,7 @@ def update_adapter(config, service_directory, service_name):
 
         # copy nginx.adapted.conf into container
         #TODO: run the whole script directly from python
-        subprocess.check_output([join(layersbox_src,"add_nginx_conf.sh"),
-service_name])
+        subprocess.check_output([join(layersbox_src,"add_nginx_conf.sh"), service_name])
 
     # send the adapter the HUP kill signal
     subprocess.check_output(["docker", "kill", '--signal="HUP"', "adapter"])
