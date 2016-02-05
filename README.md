@@ -24,4 +24,4 @@ For example, `layersbox` enters your Web app into the Nginx config file (in our 
 1. In your docker-compose.yml, you must name the resulting container the exact same way you name your service in your nginx.conf.
 2. There are some limitations on the names you may assign to your services imposed by the current Docker Compose implementation stage. Among others, it is strongly recommended you name your services and containers only with lowercase letters (no hyphens, no lowerscore, no digits).
 
-# F&Q
+# FAQ
