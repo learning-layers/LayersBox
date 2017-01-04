@@ -132,6 +132,29 @@ def read_url(dir):
                 m = p.match(line)
                 if m:
                     return m.group(1)
+        raise
+    except:
+        raise
+
+def read_admin(dir):
+    """Reads the LayersBox admin from the common.env file
+
+    :dest: The directory of the LayersBox
+    :returns: the LayersBox admin
+
+    """
+    dir_env = join(dir, 'common.env')
+    try:
+        os.stat(dir_env)
+        with open(dir_env, 'r') as f:
+            lines = f.readlines()
+            p = re.compile('^LAYERS_API_ADMIN=(.*)$')
+            for line in lines:
+                line = line.strip()
+                m = p.match(line)
+                if m:
+                    return m.group(1)
+        raise
     except:
         raise
 
@@ -586,7 +609,7 @@ def update_adapter(config, service_directory, service_name):
         subprocess.check_output([join(layersbox_src,"add_nginx_conf.sh"), service_name])
 
     # send the adapter the HUP kill signal
-    subprocess.check_output(["docker", "kill", '--signal="HUP"', "adapter"])
+    subprocess.check_output(["docker", "kill", "--signal=HUP", "adapter"])
 
     return 0
 
@@ -641,7 +664,16 @@ def box_init(args):
     dir = args.directory
     if not os.path.exists(dir):
         os.makedirs(dir)
+    admin = "THIS SHOULD HAVE BEEN REPLACED"
     url = "THIS SHOULD HAVE BEEN REPLACED"
+    try: 
+        admin = read_admin(dir)
+        print("Found existing admin, using admin:{}"
+              .format(admin))
+    except: 
+        admin = raw_input("Enter admin username: ")
+        with open(join(dir, "common.env"), 'w') as f:
+            f.write("LAYERS_API_ADMIN={}\n".format(admin))
     try:
         url = read_url(dir)
         print("Found existing configuration, using URL https://{}/"
@@ -650,7 +682,7 @@ def box_init(args):
         url = raw_input(
             "Enter the URL the box should be reachable at. \
             (Don't put a / at the end)\nhttps://").strip("/")
-        with open(join(dir, "common.env"), 'w') as f:
+        with open(join(dir, "common.env"), 'a') as f:
             f.write("LAYERS_API_URI=https://{}/\n".format(url))
             f.write("LAYERS_APP_URI=https://{}/\n".format(url))
         os.makedirs(join(dir, "tmp"))
