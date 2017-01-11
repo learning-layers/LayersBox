@@ -4,15 +4,22 @@ An npm- and bower-like script to setup and configure a Docker host with a revers
 # Try It Out!
 For now, we think the best way to try out `layersbox` is on an Ubuntu server. We have put online a short tutorial on how to set up your test environment: http://developer.learning-layers.eu/documentation/layers-box/environment-setup/
 
-# Installation
-1. Clone the repository: `git clone https://github.com/learning-layers/LayersBox.git`
-
 # Usage
 * run `layersbox init` to initialize a Layers Box with Nginx (the Layers Adapter) and MySQL
 * run `layersbox start` to start the Layers Box
 * run `layersbox stop` to stop the Layers Box
 * run `layersbox status` to see the status of the currently deployed services
 * run `layersbox install repo#version` to install a new service on the Layers Box, e.g. `layersbox install learning-layers/documentation#0.0.1`
+
+# Installation
+Learn here, how to install a set of core services onto your Layers Box. The example takes place on Ubuntu 16.04.1 LTS.
+1. Clone the repository: `git clone https://github.com/learning-layers/LayersBox.git`
+2. Change into the `LayersBox` directory: `cd LayersBox`
+3. Initialize the Layers Box: `sudo ./layersbox init`
+4. Start your Layers Box: `sudo ./layersbox start`
+5. Install OpenLDAP: `sudo ./layersbox install learning-layers/openldap`
+6. Install the OpenID Connect authentication server: `sudo ./layersbox install learning-layers/openidconnect`
+7. Install the registration frontend: `sudo ./layersbox install learning-layers/openldapaccount`
 
 # How It Works
 `layersbox` is a Python script that makes it easy to install new software packages on your server. All you need is a Docker and Docker Compose installation. It heavily relies on Docker Compose for starting your Web app containers. Whenever you type `layersbox install repo#version`, it will download the latest release of the `repo` from GitHub. Then, it gets the `docker-compose.yml` file from the repo and combines it with the existing docker-compose.yml of the Layers Box. The great thing when instantiating the combined file is that already running containers are not shut down. Only the new ones are started and linked to the existing ones.
