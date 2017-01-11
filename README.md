@@ -14,7 +14,7 @@ For now, we think the best way to try out `layersbox` is on an Ubuntu server. We
 # Installation
 Learn here, how to install a set of core services onto your Layers Box. The example takes place on Ubuntu 16.04.1 LTS.
 
-1. Clone the repository: `git clone https://github.com/learning-layers/LayersBox.git`
+1. Clone the repository: `git clone https://github.com/learning-layers/LayersBox.git`. Make sure that all line endings are unix style `LF`s, otherwise the next steps will fail.
 2. Change into the `LayersBox` directory: `cd LayersBox`
 3. Initialize the Layers Box: `sudo ./layersbox init`
 4. Start your Layers Box: `sudo ./layersbox start`
