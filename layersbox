@@ -522,7 +522,7 @@ def box_uninstall(args):
 
     for image in images:
         # get the container numbers
-        container_numbers = subprocess.check_output(["docker", "ps", "-a" "-q", "--filter", "ancestor={}".format(image)])
+        container_numbers = subprocess.check_output(["docker", "ps", "-aq", "--filter", "ancestor={}".format(image)])
         if container_numbers == "":
             break
 
