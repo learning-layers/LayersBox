@@ -14,7 +14,8 @@ if [ $# -le 1 ]
 	exit 1
 fi
 
-td=/usr/local/openresty/conf/services
+tc=/usr/local/openresty/conf
+td=$tc/services
 echo "The path for all service subdirectories is set to $td ."
 
 out=$(docker ps -a | grep -c adapter-data)
@@ -22,27 +23,30 @@ out=$(docker ps -a | grep -c adapter-data)
 if [ $out -gt 0 ]
  then
 	echo "Adapter data container found. Checking whether the service has been added already..."
-	nsv=$td/$sn
-	osv=$(docker exec adapter ls $nsv)
-
-	if [ -z $osv  ]
+	nsv=$(docker exec adapter ls $tc)
+	if [[ $nsv != *"services"* ]] 
 	 then
+	 	docker exec adapter mkdir -p $td/
+	fi
+	nsv=$(docker exec adapter ls $td)
+	if [[ $nsv == *"$sn"* ]] 
+	 then
+	 	echo "Previous configuration detected. Deleting old configuration..."
+		docker exec adapter rm -rf $td/$sn
+		echo "Recreating path for new dir..."
+	 else
 		echo "No previous configuration for this service found. Proceeding with setup..."
 		echo "Creating path for new dir..."
-	 else
-		echo "Previous configuration detected. Deleting old configuration..."
-		docker exec adapter rm -rf $osv
-		echo "Recreating path for new dir..."
 	fi
 
-	docker exec adapter mkdir -p $nsv/
+	docker exec adapter mkdir -p $td/$sn/
 
 	sf="nginx.adapted.conf"
 	if [ -f ./services/$sn/$sf ]
 	 then
 		echo "Service's nginx.adapted.conf found."
 		echo "Copying service's nginx.adapted.conf to newly created path $nsv..."
-		docker cp ./services/$sn/${sf} adapter-data:$nsv
+		docker cp ./services/$sn/${sf} adapter-data:$td/$sn
 	 else
 		echo "No configuration file found! The file must be named 'nginx.adapted.conf'. Aborting..."
 		exit 1
