@@ -691,6 +691,11 @@ def box_init(args):
         os.makedirs(join(dir, "services", "mysql"))
         with open(join(dir, "services", "mysql", "MYSQL.env"), 'w') as f:
             f.write("MYSQL_ROOT_PASSWORD=pass")
+
+        # Todo install only if you enter something
+        fed = raw_input("Enter Layersbox-bootstrap ip and port: ")
+        with open(join(dir, "common.env"), 'a') as f:
+            f.write("FED_BOOTSTRAP="+fed+"\n")
     dir_yml = join(dir, base)
     try:
         os.stat(dir_yml)
