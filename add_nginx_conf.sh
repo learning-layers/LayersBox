@@ -47,6 +47,8 @@ if [ $out -gt 0 ]
 		echo "Service's nginx.adapted.conf found."
 		echo "Copying service's nginx.adapted.conf to newly created path $nsv..."
 		docker cp ./services/$sn/${sf} adapter-data:$td/$sn
+		localhost_ip="$(ifconfig en0 inet | grep "inet " | awk -F'[: ]+' '{ print $2 }')"
+		docker exec adapter sed -i s#dockerhost#http://$localhost_ip#g $td/$sn/$sf
 	 else
 		echo "No configuration file found! The file must be named 'nginx.adapted.conf'. Aborting..."
 		exit 1
