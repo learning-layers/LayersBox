@@ -635,9 +635,13 @@ def box_start(args):
     print("You can now reach your Layers Box at https://{}/".format(url))
 
     if os.path.isfile(".rest"):
-        proc = subprocess.Popen(['python', 'layersbox-studio.py'],shell=False)
-        f = open('.rest', 'w+')
-        f.write(str(proc.pid))
+        f = open(".rest","r")
+        pid = f.read()
+        p = int(pid)
+        if p==0: 
+            proc = subprocess.Popen(['python', 'layersbox-studio.py'],shell=False)
+            f = open('.rest', 'w+')
+            f.write(str(proc.pid))
     return 0
 
 
