@@ -676,6 +676,7 @@ def box_ps(args):
 def box_init(args):
     """Initializes a LayersBox"""
     print("Initializing LayersBox...")
+    installCore = False
     dir = args.directory
     if not os.path.exists(dir):
         os.makedirs(dir)
@@ -717,6 +718,7 @@ def box_init(args):
         if rest=="y" or rest=="Y":
             with open(join(dir, ".rest"), 'w+') as f:
                 f.write("0")
+            installCore = True
     dir_yml = join(dir, base)
     try:
         os.stat(dir_yml)
@@ -753,11 +755,27 @@ def box_init(args):
 
     print("Initializion complete.")
     print("Make sure port 80 and 443 are not in use on this machine")
-    print("You can start your LayersBox with 'layersbox start'")
     # Workaround for logs dir not being available in the adapterdata container
     log_dir = join(dir, 'logs/')
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
+    if(installCore):
+        print("Installing openldap:")
+        os.system("python layersbox install learning-layers/openldap")
+        print("Installing openidconnect:")
+        os.system("python layersbox install learning-layers/openidconnect")
+        print("Installing openldapaccount:")
+        os.system("python layersbox install learning-layers/openldapaccount")
+        print("Installing fed:")
+        os.system("python layersbox install learning-layers/fed")
+        print("Installing layersbox-studio:")
+        os.system("python layersbox install learning-layers/layersbox-studio")
+        
+        proc = subprocess.Popen(['python', 'layersbox-studio.py'],shell=False)
+        f = open('.rest', 'w+')
+        f.write(str(proc.pid))
+    else:
+        print("You can start your LayersBox with 'layersbox start'")
     return 0
 
 
