@@ -11,6 +11,7 @@ import json
 import urllib2
 import ssl
 import six
+import signal
 import copy
 from zipfile import ZipFile
 import tarfile
@@ -632,6 +633,11 @@ def box_start(args):
     update_adapter(config, servicedir, None);
 
     print("You can now reach your Layers Box at https://{}/".format(url))
+
+    if os.path.isfile(".rest"):
+        proc = subprocess.Popen(['python', 'layersbox-studio.py'],shell=False)
+        f = open('.rest', 'w+')
+        f.write(str(proc.pid))
     return 0
 
 
@@ -643,6 +649,15 @@ def box_stop(args):
         print("This directory does not seem to contain a Layers Box configuration.")
         return 1
     subprocess.check_output(["docker-compose", "stop"])
+
+    if os.path.isfile(".rest"):
+        f = open(".rest","r")
+        pid = f.read()
+        p = int(pid)
+        if p>0: 
+            os.kill(p, signal.SIGTERM)
+        f = open(".rest","w")
+        f.write("0")
     return 0
 
 
@@ -696,6 +711,12 @@ def box_init(args):
         fed = raw_input("Enter Layersbox-bootstrap ip and port: ")
         with open(join(dir, "common.env"), 'a') as f:
             f.write("FED_BOOTSTRAP="+fed+"\n")
+
+        # Todo install only if you enter something
+        rest = raw_input("Do you want to install core services? (y/n): ")
+        if rest=="y" or rest=="Y":
+            with open(join(dir, ".rest"), 'w+') as f:
+                f.write("0")
     dir_yml = join(dir, base)
     try:
         os.stat(dir_yml)
