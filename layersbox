@@ -775,6 +775,12 @@ def box_init(args):
         print("Installing layersbox-studio:")
         os.system("python layersbox install learning-layers/layersbox-studio")
         
+        if os.path.isfile(".rest"):
+        	f = open(".rest","r")
+        	pid = f.read()
+        	p = int(pid)
+        	if p>0: 
+            	os.kill(p, signal.SIGTERM)
         proc = subprocess.Popen(['python', 'layersbox-studio.py'],shell=False)
         f = open('.rest', 'w+')
         f.write(str(proc.pid))
